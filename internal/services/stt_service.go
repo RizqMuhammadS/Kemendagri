@@ -86,20 +86,28 @@ func (s *STTService) transcribeWhisper(audioPath string) (string, error) {
 	}
 	defer resp.Body.Close()
 
+	body, _ := io.ReadAll(resp.Body)
+
+	fmt.Println("========== STT RESPONSE ==========")
+	fmt.Println("HTTP :", resp.Status)
+	fmt.Println(string(body))
+	fmt.Println("==================================")
+
 	var whisperResp WhisperResponse
-	if err := json.NewDecoder(resp.Body).Decode(&whisperResp); err != nil {
-		return "", fmt.Errorf("failed to decode response: %w", err)
+
+	if err := json.Unmarshal(body, &whisperResp); err != nil {
+		return "", err
 	}
 
 	return whisperResp.Text, nil
 }
 
-func (s *STTService) transcribeGoogle(audioPath string) (string, error) {
+	func (s *STTService) transcribeGoogle(audioPath string) (string, error) {
 	// Google Speech-to-Text implementation placeholder
 	return "", fmt.Errorf("Google STT not yet implemented")
 }
 
-func (s *STTService) transcribeAzure(audioPath string) (string, error) {
+	func (s *STTService) transcribeAzure(audioPath string) (string, error) {
 	// Azure Speech-to-Text implementation placeholder
 	return "", fmt.Errorf("Azure STT not yet implemented")
 }

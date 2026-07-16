@@ -247,8 +247,11 @@
             formData.append('meeting_id', meetingId);
 
             const btn = document.getElementById('uploadBtn');
+            const fileInput = document.getElementById('audioFile');
+            const processBtn = document.getElementById('processTranscriptBtn');
             btn.disabled = true;
-            btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Memproses...';
+            fileInput.disabled = true;
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Upload & Proses Notulensi...';
 
             try {
                 const token = getToken();
@@ -259,16 +262,25 @@
                 });
                 const json = await res.json();
                 if (json.success) {
-                    showAlert('Audio berhasil diupload!', 'success');
-                    loadMeeting();
+                    showAlert('✅ Audio berhasil diproses! Notulensi sedang di-generate...', 'success');
+                    // Reload untuk menampilkan hasil transcript + notulensi AI
+                    await loadMeeting();
+                    // Jika sudah completed, sembunyikan tombol generate manual
+                    if (meetingData && meetingData.summary) {
+                        processBtn.classList.add('hidden');
+                    }
+                    showAlert('✅ Notulensi berhasil digenerate!', 'success');
                 } else {
                     showAlert(json.error || 'Gagal upload audio', 'error');
+                    // Jika transcript berhasil tersimpan tapi AI gagal, tetap load
+                    await loadMeeting();
                 }
             } catch (err) {
-                showAlert('Gagal upload audio', 'error');
+                showAlert('Gagal upload audio: ' + err.message, 'error');
             }
             btn.disabled = false;
-            btn.innerHTML = '<i class="fas fa-cloud-upload-alt mr-2"></i>Upload & Transkrip';
+            fileInput.disabled = false;
+            btn.innerHTML = '<i class="fas fa-cloud-upload-alt mr-2"></i>Upload Audio';
         }
 
         async function processTranscript() {

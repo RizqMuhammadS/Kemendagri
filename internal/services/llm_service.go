@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strings"
 
 	"github.com/yourusername/meeting-minutes-ai/internal/config"
 	"github.com/yourusername/meeting-minutes-ai/internal/models"
@@ -140,6 +141,10 @@ func (s *LLMService) callLLM(prompt string) (string, error) {
 		return "", fmt.Errorf("failed to marshal request: %w", err)
 	}
 
+	fmt.Println("===== REQUEST BODY =====")
+	fmt.Println(string(jsonData))
+	fmt.Println("========================")
+
 	req, err := http.NewRequest("POST", s.cfg.LLMApiUrl, bytes.NewBuffer(jsonData))
 	if err != nil {
 		return "", fmt.Errorf("failed to create request: %w", err)
@@ -147,6 +152,8 @@ func (s *LLMService) callLLM(prompt string) (string, error) {
 
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", "Bearer "+s.cfg.LLMApiKey)
+	req.Header.Set("HTTP-Referer", "http://localhost:8080")
+	req.Header.Set("X-Title", "Meeting Minutes AI")
 
 	client := &http.Client{}
 	resp, err := client.Do(req)
@@ -157,12 +164,20 @@ func (s *LLMService) callLLM(prompt string) (string, error) {
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return "", fmt.Errorf("failed to read response body: %w", err)
+		return "", err
 	}
 
+	responseText := string(body)
+
+	//Hilangkan marker streaming dari 9Router
+	responseText = strings.ReplaceAll(responseText, "data: [DONE]", "")
+	responseText = strings.TrimSpace(responseText)
+
+	fmt.Println(responseText)
+
 	var llmResp LLMResponse
-	if err := json.Unmarshal(body, &llmResp); err != nil {
-		return "", fmt.Errorf("failed to decode LLM response: %w", err)
+	if err := json.Unmarshal([]byte(responseText), &llmResp); err != nil {
+		return "", fmt.Errorf("failed to decode LLM response: %w\nBody:\n%s", err, responseText)
 	}
 
 	if llmResp.Error != nil {

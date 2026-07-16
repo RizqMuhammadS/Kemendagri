@@ -2,8 +2,11 @@ package config
 
 import (
 	"fmt"
+	"log"
 	"os"
+	"path/filepath"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/joho/godotenv"
@@ -43,7 +46,21 @@ type Config struct {
 }
 
 func Load() *Config {
-	_ = godotenv.Load()
+	// Try to load .env from current working directory first
+	err := godotenv.Load()
+	if err != nil {
+		// If that fails, try loading from the executable's directory
+		exePath, exeErr := os.Executable()
+		if exeErr == nil {
+			exeDir := filepath.Dir(exePath)
+			envPath := filepath.Join(exeDir, ".env")
+			log.Printf("Trying to load .env from: %s", envPath)
+			err = godotenv.Load(envPath)
+		}
+	}
+	if err != nil {
+		log.Printf("Warning: .env file not loaded: %v", err)
+	}
 
 	cfg := &Config{
 		ServerPort:    getEnvInt("SERVER_PORT", 8080),
@@ -78,6 +95,32 @@ func Load() *Config {
 		ExportDir: getEnv("EXPORT_DIR", "./exports"),
 	}
 
+	fmt.Println("======================================")
+	fmt.Println("LLM_API_KEY dari env:", os.Getenv("LLM_API_KEY"))
+
+	if len(cfg.LLMApiKey) > 20 {
+		fmt.Println("Config LLM Key Prefix :", cfg.LLMApiKey[:20])
+	} else {
+		fmt.Println("Config LLM Key :", cfg.LLMApiKey)
+	}
+
+	fmt.Println("LLM Model :", cfg.LLMModel)
+	fmt.Println("LLM URL   :", cfg.LLMApiUrl)
+	fmt.Println("======================================")
+
+	// Debug: log LLM config status (key masked for security)
+	apiKeyStatus := "not set"
+	if cfg.LLMApiKey != "" {
+		if len(cfg.LLMApiKey) >= 8 {
+			apiKeyStatus = fmt.Sprintf("set (masked: %s...%s)", cfg.LLMApiKey[:4], cfg.LLMApiKey[len(cfg.LLMApiKey)-4:])
+		} else {
+			apiKeyStatus = "set (too short)"
+		}
+	}
+	log.Printf("LLM API Key: %s", apiKeyStatus)
+	log.Printf("LLM Model: %s", cfg.LLMModel)
+	log.Printf("LLM API URL: %s", cfg.LLMApiUrl)
+
 	return cfg
 }
 
@@ -87,7 +130,7 @@ func (c *Config) ServerAddr() string {
 
 func getEnv(key, defaultValue string) string {
 	if value := os.Getenv(key); value != "" {
-		return value
+		return strings.TrimSpace(value)
 	}
 	return defaultValue
 }

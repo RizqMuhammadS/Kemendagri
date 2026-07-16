@@ -133,10 +133,16 @@ func (s *MeetingService) UploadAudio(meetingID uint, file *multipart.FileHeader)
 		return fmt.Errorf("transkripsi audio gagal: %w", err)
 	}
 
-	// Save transcript to meeting
-	meeting.Transcript = transcript
-	meeting.Status = "transcribed"
-	_ = s.meetingRepo.Update(meeting)
+	// Auto-generate notulensi dari hasil transkrip menggunakan AI
+	// Proses: transcript → cleaner → LLM summary → structured result
+	_, err = s.ProcessTranscript(meetingID, transcript)
+	if err != nil {
+		// Jika AI gagal, transcript tetap tersimpan agar user bisa coba lagi
+		meeting.Transcript = transcript
+		meeting.Status = "transcribed"
+		_ = s.meetingRepo.Update(meeting)
+		return fmt.Errorf("transkripsi berhasil, tetapi generate notulensi AI gagal: %w", err)
+	}
 
 	return nil
 }
