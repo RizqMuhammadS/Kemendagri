@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard - Sistem Notulensi AI</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        .sidebar { min-height: 100vh; }
+        @media (max-width: 768px) { .sidebar { min-height: auto; } }
+    </style>
+</head>
+<body class="bg-gray-100">
+    <div class="flex flex-col md:flex-row">
+        <!-- Sidebar -->
+        <aside class="sidebar bg-indigo-800 text-white w-full md:w-64 p-4">
+            <div class="text-xl font-bold mb-8">
+                <i class="fas fa-file-alt mr-2"></i>Notulensi AI
+            </div>
+            <nav>
+                <a href="/dashboard" class="flex items-center py-2 px-4 rounded bg-indigo-700 mb-1">
+                    <i class="fas fa-tachometer-alt w-6"></i> Dashboard
+                </a>
+                <a href="/meetings" class="flex items-center py-2 px-4 rounded hover:bg-indigo-700 mb-1">
+                    <i class="fas fa-list w-6"></i> Daftar Rapat
+                </a>
+                <a href="/meetings/create" class="flex items-center py-2 px-4 rounded hover:bg-indigo-700 mb-1">
+                    <i class="fas fa-plus-circle w-6"></i> Buat Rapat
+                </a>
+                <hr class="my-4 border-indigo-600">
+                <div id="userName" class="text-sm px-4 mb-2 opacity-75">User</div>
+                <button onclick="logout()" class="flex items-center py-2 px-4 rounded hover:bg-red-600 w-full text-left">
+                    <i class="fas fa-sign-out-alt w-6"></i> Logout
+                </button>
+            </nav>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="flex-1 p-6">
+            <div class="max-w-6xl mx-auto">
+                <h1 class="text-3xl font-bold text-gray-800 mb-6">Dashboard</h1>
+
+                <!-- Stat Cards -->
+                <div id="statsContainer" class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+                    <div class="bg-white rounded-lg shadow p-6 animate-pulse"><div class="h-4 bg-gray-200 rounded w-1/2 mb-2"></div><div class="h-6 bg-gray-200 rounded w-1/3"></div></div>
+                    <div class="bg-white rounded-lg shadow p-6 animate-pulse"><div class="h-4 bg-gray-200 rounded w-1/2 mb-2"></div><div class="h-6 bg-gray-200 rounded w-1/3"></div></div>
+                    <div class="bg-white rounded-lg shadow p-6 animate-pulse"><div class="h-4 bg-gray-200 rounded w-1/2 mb-2"></div><div class="h-6 bg-gray-200 rounded w-1/3"></div></div>
+                </div>
+
+                <!-- Meetings by Status -->
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+                    <div class="bg-white rounded-lg shadow p-6">
+                        <h2 class="text-xl font-semibold text-gray-800 mb-4">
+                            <i class="fas fa-check-circle text-green-500 mr-2"></i>Rapat Selesai
+                        </h2>
+                        <div id="completedMeetings" class="space-y-3">
+                            <div class="animate-pulse space-y-2">
+                                <div class="h-4 bg-gray-200 rounded w-full"></div>
+                                <div class="h-4 bg-gray-200 rounded w-3/4"></div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="bg-white rounded-lg shadow p-6">
+                        <h2 class="text-xl font-semibold text-gray-800 mb-4">
+                            <i class="fas fa-clock text-yellow-500 mr-2"></i>Rapat Menunggu / Diproses
+                        </h2>
+                        <div id="pendingMeetings" class="space-y-3">
+                            <div class="animate-pulse space-y-2">
+                                <div class="h-4 bg-gray-200 rounded w-full"></div>
+                                <div class="h-4 bg-gray-200 rounded w-3/4"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script>
+        const API_BASE = '/api';
+        function getToken() { return localStorage.getItem('token'); }
+        async function apiRequest(method, path, data) {
+            const headers = { 'Content-Type': 'application/json' };
+            const token = getToken();
+            if (token) headers['Authorization'] = 'Bearer ' + token;
+            const config = { method, headers };
+            if (data) config.body = JSON.stringify(data);
+            const res = await fetch(API_BASE + path, config);
+            const json = await res.json();
+            if (!json.success && res.status === 401) {
+                localStorage.removeItem('token');
+                localStorage.removeItem('user');
+                window.location.href = '/login';
+            }
+            return json;
+        }
+        function logout() {
+            localStorage.removeItem('token');
+            localStorage.removeItem('user');
+            window.location.href = '/login';
+        }
+        function showAlert(msg, type) {
+            const div = document.createElement('div');
+            div.className = 'fixed top-4 right-4 px-6 py-3 rounded shadow-lg text-white z-50 ' + (type === 'success' ? 'bg-green-500' : type === 'error' ? 'bg-red-500' : 'bg-blue-500');
+            div.innerHTML = msg;
+            document.body.appendChild(div);
+            setTimeout(() => div.remove(), 3000);
+        }
+
+        document.addEventListener('DOMContentLoaded', async () => {
+            const user = JSON.parse(localStorage.getItem('user') || '{}');
+            if (!user.id) { window.location.href = '/login'; return; }
+            document.getElementById('userName').textContent = user.name || 'User';
+
+            try {
+                // Load dashboard stats
+                const dashRes = await apiRequest('GET', '/dashboard');
+                if (dashRes.success) {
+                    const d = dashRes.data;
+                    document.getElementById('statsContainer').innerHTML = `
+                        <div class="bg-white rounded-lg shadow p-6 border-l-4 border-blue-500">
+                            <div class="text-gray-500 text-sm">Total Rapat</div>
+                            <div class="text-3xl font-bold text-gray-800">${d.total_meetings || 0}</div>
+                        </div>
+                        <div class="bg-white rounded-lg shadow p-6 border-l-4 border-green-500">
+                            <div class="text-gray-500 text-sm">Selesai</div>
+                            <div class="text-3xl font-bold text-green-600">${d.completed_meetings || 0}</div>
+                        </div>
+                        <div class="bg-white rounded-lg shadow p-6 border-l-4 border-yellow-500">
+                            <div class="text-gray-500 text-sm">Menunggu / Diproses</div>
+                            <div class="text-3xl font-bold text-yellow-600">${d.pending_meetings || 0}</div>
+                        </div>
+                    `;
+                }
+
+                // Load all meetings and separate by status
+                const meetRes = await apiRequest('GET', '/meetings?page=1&page_size=100');
+                const meetings = meetRes.data && meetRes.data.meetings ? meetRes.data.meetings : [];
+                if (meetings.length > 0) {
+                    const completed = meetings.filter(m => m.status === 'completed');
+                    const pending = meetings.filter(m => m.status !== 'completed');
+
+                    const statusBadge = (status) => {
+                        const map = { 'completed': 'bg-green-100 text-green-700', 'processing': 'bg-yellow-100 text-yellow-700', 'pending': 'bg-gray-100 text-gray-600', 'failed': 'bg-red-100 text-red-700' };
+                        const label = { 'completed': 'Selesai', 'processing': 'Diproses', 'pending': 'Menunggu', 'failed': 'Gagal' };
+                        return `<span class="inline-block px-2 py-0.5 text-xs rounded font-medium ${map[status] || 'bg-gray-100 text-gray-600'}">${label[status] || status}</span>`;
+                    };
+
+                    if (completed.length > 0) {
+                        document.getElementById('completedMeetings').innerHTML = completed.map(m => `
+                            <a href="/meetings/${m.id}" class="block p-3 border rounded-lg hover:bg-gray-50 transition border-l-4 border-l-green-400">
+                                <div class="font-semibold text-gray-800">${m.title}</div>
+                                <div class="text-sm text-gray-500 mt-1">
+                                    <i class="fas fa-calendar mr-1"></i>${m.date || '-'}
+                                    ${m.location ? '<i class="fas fa-map-marker-alt ml-3 mr-1"></i>' + m.location : ''}
+                                    <span class="ml-3">${statusBadge(m.status)}</span>
+                                </div>
+                            </a>
+                        `).join('');
+                    } else {
+                        document.getElementById('completedMeetings').innerHTML = '<p class="text-gray-500">Belum ada rapat yang selesai.</p>';
+                    }
+
+                    if (pending.length > 0) {
+                        document.getElementById('pendingMeetings').innerHTML = pending.map(m => `
+                            <a href="/meetings/${m.id}" class="block p-3 border rounded-lg hover:bg-gray-50 transition border-l-4 border-l-yellow-400">
+                                <div class="font-semibold text-gray-800">${m.title}</div>
+                                <div class="text-sm text-gray-500 mt-1">
+                                    <i class="fas fa-calendar mr-1"></i>${m.date || '-'}
+                                    ${m.location ? '<i class="fas fa-map-marker-alt ml-3 mr-1"></i>' + m.location : ''}
+                                    <span class="ml-3">${statusBadge(m.status)}</span>
+                                </div>
+                            </a>
+                        `).join('');
+                    } else {
+                        document.getElementById('pendingMeetings').innerHTML = '<p class="text-gray-500">Belum ada rapat menunggu. <a href="/meetings/create" class="text-indigo-600 hover:underline">Buat rapat baru</a></p>';
+                    }
+                } else {
+                    document.getElementById('completedMeetings').innerHTML = '<p class="text-gray-500">Belum ada rapat yang selesai.</p>';
+                    document.getElementById('pendingMeetings').innerHTML = '<p class="text-gray-500">Belum ada rapat. <a href="/meetings/create" class="text-indigo-600 hover:underline">Buat rapat baru</a></p>';
+                }
+            } catch (err) {
+                document.getElementById('statsContainer').innerHTML = '<div class="col-span-3 text-center text-red-500">Gagal memuat data dashboard</div>';
+                document.getElementById('completedMeetings').innerHTML = '';
+                document.getElementById('pendingMeetings').innerHTML = '';
+            }
+        });
+    </script>
+</body>
+</html>

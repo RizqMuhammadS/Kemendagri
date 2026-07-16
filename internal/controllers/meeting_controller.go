@@ -2,6 +2,7 @@ package controllers
 
 import (
 	"net/http"
+	"path/filepath"
 	"strconv"
 
 	"github.com/gin-gonic/gin"
@@ -24,6 +25,7 @@ func NewMeetingController(meetingService *services.MeetingService) *MeetingContr
 // @Tags Meetings
 // @Accept json
 // @Produce json
+// @Security BearerAuth
 // @Param request body dto.CreateMeetingRequest true "Meeting data"
 // @Success 201 {object} dto.APIResponse
 // @Router /api/meetings [post]
@@ -58,6 +60,7 @@ func (c *MeetingController) CreateMeeting(ctx *gin.Context) {
 // @Summary Get meeting details
 // @Tags Meetings
 // @Produce json
+// @Security BearerAuth
 // @Param id path int true "Meeting ID"
 // @Success 200 {object} dto.APIResponse
 // @Router /api/meetings/{id} [get]
@@ -90,6 +93,7 @@ func (c *MeetingController) GetMeeting(ctx *gin.Context) {
 // @Summary List all meetings
 // @Tags Meetings
 // @Produce json
+// @Security BearerAuth
 // @Param page query int false "Page number"
 // @Param page_size query int false "Page size"
 // @Success 200 {object} dto.APIResponse
@@ -123,6 +127,7 @@ func (c *MeetingController) ListMeetings(ctx *gin.Context) {
 // @Tags Meetings
 // @Accept multipart/form-data
 // @Produce json
+// @Security BearerAuth
 // @Param meeting_id formData int true "Meeting ID"
 // @Param audio formData file true "Audio file"
 // @Success 200 {object} dto.APIResponse
@@ -165,6 +170,7 @@ func (c *MeetingController) UploadAudio(ctx *gin.Context) {
 // @Tags Meetings
 // @Accept json
 // @Produce json
+// @Security BearerAuth
 // @Param request body dto.ProcessTranscriptRequest true "Transcript data"
 // @Success 200 {object} dto.APIResponse
 // @Router /api/meetings/process-transcript [post]
@@ -199,6 +205,7 @@ func (c *MeetingController) ProcessTranscript(ctx *gin.Context) {
 // @Tags Export
 // @Accept json
 // @Produce json
+// @Security BearerAuth
 // @Param request body dto.ExportRequest true "Export data"
 // @Success 200 {object} dto.APIResponse
 // @Router /api/meetings/export [post]
@@ -221,13 +228,18 @@ func (c *MeetingController) ExportMeeting(ctx *gin.Context) {
 		return
 	}
 
-	ctx.JSON(http.StatusOK, dto.APIResponse{
-		Success: true,
-		Message: "Notulensi berhasil diexport",
-		Data: gin.H{
-			"file_path": path,
-		},
-	})
+	// Serve file download
+	contentType := "application/octet-stream"
+	switch req.Format {
+	case "pdf":
+		contentType = "application/pdf"
+	case "word", "docx":
+		contentType = "application/msword"
+	}
+
+	ctx.Header("Content-Disposition", "attachment; filename=\""+filepath.Base(path)+"\"")
+	ctx.Header("Content-Type", contentType)
+	ctx.File(path)
 }
 
 // SendEmail handles sending meeting minutes via email
@@ -235,6 +247,7 @@ func (c *MeetingController) ExportMeeting(ctx *gin.Context) {
 // @Tags Export
 // @Accept json
 // @Produce json
+// @Security BearerAuth
 // @Param request body dto.SendEmailRequest true "Email data"
 // @Success 200 {object} dto.APIResponse
 // @Router /api/meetings/send-email [post]
@@ -271,6 +284,7 @@ func (c *MeetingController) SendEmail(ctx *gin.Context) {
 // @Summary Get dashboard statistics
 // @Tags Dashboard
 // @Produce json
+// @Security BearerAuth
 // @Success 200 {object} dto.APIResponse
 // @Router /api/dashboard [get]
 func (c *MeetingController) GetDashboard(ctx *gin.Context) {

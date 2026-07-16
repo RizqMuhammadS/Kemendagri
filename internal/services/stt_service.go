@@ -71,7 +71,12 @@ func (s *STTService) transcribeWhisper(audioPath string) (string, error) {
 		return "", fmt.Errorf("failed to create request: %w", err)
 	}
 
-	req.Header.Set("Authorization", "Bearer "+s.cfg.LLMApiKey)
+	// Use STT API key, fallback to LLM API key if not set
+	apiKey := s.cfg.STTApiKey
+	if apiKey == "" {
+		apiKey = s.cfg.LLMApiKey
+	}
+	req.Header.Set("Authorization", "Bearer "+apiKey)
 	req.Header.Set("Content-Type", writer.FormDataContentType())
 
 	client := &http.Client{}

@@ -97,9 +97,16 @@ func (s *TextCleanerService) normalizeWhitespace(text string) string {
 
 func (s *TextCleanerService) removeStuttering(text string) string {
 	// Remove repeated words (e.g., "I I think" -> "I think")
-	re := regexp.MustCompile(`\b(\w+)\s+\1\b`)
-	for re.MatchString(text) {
-		text = re.ReplaceAllString(text, "$1")
+	// Note: Go RE2 does not support backreferences, so we do this manually
+	words := strings.Fields(text)
+	if len(words) <= 1 {
+		return text
 	}
-	return text
+	result := []string{words[0]}
+	for i := 1; i < len(words); i++ {
+		if strings.ToLower(words[i]) != strings.ToLower(words[i-1]) {
+			result = append(result, words[i])
+		}
+	}
+	return strings.Join(result, " ")
 }

@@ -1,0 +1,340 @@
+basePath: /api
+definitions:
+  dto.APIResponse:
+    properties:
+      data: {}
+      error:
+        type: string
+      message:
+        type: string
+      success:
+        type: boolean
+    type: object
+  dto.CreateMeetingRequest:
+    properties:
+      date:
+        type: string
+      location:
+        type: string
+      participants:
+        items:
+          $ref: '#/definitions/dto.ParticipantRequest'
+        type: array
+      title:
+        type: string
+    required:
+    - date
+    - title
+    type: object
+  dto.ExportRequest:
+    properties:
+      format:
+        description: pdf, word
+        type: string
+      meeting_id:
+        type: integer
+    required:
+    - format
+    - meeting_id
+    type: object
+  dto.LoginRequest:
+    properties:
+      email:
+        type: string
+      password:
+        type: string
+    required:
+    - email
+    - password
+    type: object
+  dto.ParticipantRequest:
+    properties:
+      email:
+        type: string
+      name:
+        type: string
+      role:
+        type: string
+    required:
+    - name
+    type: object
+  dto.ProcessTranscriptRequest:
+    properties:
+      meeting_id:
+        type: integer
+      transcript:
+        type: string
+    required:
+    - meeting_id
+    - transcript
+    type: object
+  dto.RegisterRequest:
+    properties:
+      email:
+        type: string
+      name:
+        type: string
+      password:
+        minLength: 6
+        type: string
+      role:
+        type: string
+    required:
+    - email
+    - name
+    - password
+    type: object
+  dto.SendEmailRequest:
+    properties:
+      format:
+        description: pdf, word (attachment format)
+        type: string
+      meeting_id:
+        type: integer
+      recipients:
+        items:
+          type: string
+        type: array
+    required:
+    - meeting_id
+    - recipients
+    type: object
+host: localhost:8080
+info:
+  contact:
+    email: developer@example.com
+    name: Tim Developer
+  description: API untuk sistem notulensi rapat otomatis dengan AI
+  license:
+    name: MIT
+    url: https://opensource.org/licenses/MIT
+  termsOfService: http://swagger.io/terms/
+  title: Meeting Minutes AI API
+  version: "1.0"
+paths:
+  /api/auth/login:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Login credentials
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/dto.LoginRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.APIResponse'
+      summary: Login user
+      tags:
+      - Auth
+  /api/auth/register:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Registration data
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/dto.RegisterRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/dto.APIResponse'
+      summary: Register a new user
+      tags:
+      - Auth
+  /api/dashboard:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.APIResponse'
+      security:
+      - BearerAuth: []
+      summary: Get dashboard statistics
+      tags:
+      - Dashboard
+  /api/meetings:
+    get:
+      parameters:
+      - description: Page number
+        in: query
+        name: page
+        type: integer
+      - description: Page size
+        in: query
+        name: page_size
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.APIResponse'
+      security:
+      - BearerAuth: []
+      summary: List all meetings
+      tags:
+      - Meetings
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Meeting data
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/dto.CreateMeetingRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/dto.APIResponse'
+      security:
+      - BearerAuth: []
+      summary: Create a new meeting
+      tags:
+      - Meetings
+  /api/meetings/{id}:
+    get:
+      parameters:
+      - description: Meeting ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.APIResponse'
+      security:
+      - BearerAuth: []
+      summary: Get meeting details
+      tags:
+      - Meetings
+  /api/meetings/export:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Export data
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/dto.ExportRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.APIResponse'
+      security:
+      - BearerAuth: []
+      summary: Export meeting minutes
+      tags:
+      - Export
+  /api/meetings/process-transcript:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Transcript data
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/dto.ProcessTranscriptRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.APIResponse'
+      security:
+      - BearerAuth: []
+      summary: Process meeting transcript
+      tags:
+      - Meetings
+  /api/meetings/send-email:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Email data
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/dto.SendEmailRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.APIResponse'
+      security:
+      - BearerAuth: []
+      summary: Send meeting minutes via email
+      tags:
+      - Export
+  /api/meetings/upload-audio:
+    post:
+      consumes:
+      - multipart/form-data
+      parameters:
+      - description: Meeting ID
+        in: formData
+        name: meeting_id
+        required: true
+        type: integer
+      - description: Audio file
+        in: formData
+        name: audio
+        required: true
+        type: file
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.APIResponse'
+      security:
+      - BearerAuth: []
+      summary: Upload meeting audio
+      tags:
+      - Meetings
+schemes:
+- http
+- https
+securityDefinitions:
+  BearerAuth:
+    in: header
+    name: Authorization
+    type: apiKey
+swagger: "2.0"

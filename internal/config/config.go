@@ -12,6 +12,13 @@ import (
 type Config struct {
 	ServerPort    int
 	ServerHost    string
+	DBDriver      string
+	DBHost        string
+	DBPort        int
+	DBUser        string
+	DBPassword    string
+	DBName        string
+	DBSSLMode     string
 	DatabasePath  string
 	UploadDir     string
 	MaxUploadSize int64
@@ -41,6 +48,13 @@ func Load() *Config {
 	cfg := &Config{
 		ServerPort:    getEnvInt("SERVER_PORT", 8080),
 		ServerHost:    getEnv("SERVER_HOST", "0.0.0.0"),
+		DBDriver:      getEnv("DB_DRIVER", "postgres"),
+		DBHost:        getEnv("DB_HOST", "localhost"),
+		DBPort:        getEnvInt("DB_PORT", 5432),
+		DBUser:        getEnv("DB_USER", "postgres"),
+		DBPassword:    getEnv("DB_PASSWORD", ""),
+		DBName:        getEnv("DB_NAME", "kemendagri"),
+		DBSSLMode:     getEnv("DB_SSLMODE", "disable"),
 		DatabasePath:  getEnv("DB_PATH", "./meeting-minutes.db"),
 		UploadDir:     getEnv("UPLOAD_DIR", "./uploads"),
 		MaxUploadSize: int64(getEnvInt("MAX_UPLOAD_SIZE", 50)) * 1024 * 1024,

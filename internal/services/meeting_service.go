@@ -2,7 +2,9 @@ package services
 
 import (
 	"fmt"
+	"io"
 	"mime/multipart"
+	"os"
 	"path/filepath"
 	"time"
 
@@ -82,7 +84,7 @@ func (s *MeetingService) CreateMeeting(req *dto.CreateMeetingRequest, organizerI
 	return meeting, nil
 }
 
-// UploadAudio handles audio file upload and triggers transcription
+// UploadAudio handles audio file upload and triggers transcription via STT (Whisper API)
 func (s *MeetingService) UploadAudio(meetingID uint, file *multipart.FileHeader) error {
 	// Find meeting
 	meeting, err := s.meetingRepo.FindByID(meetingID)
@@ -94,13 +96,48 @@ func (s *MeetingService) UploadAudio(meetingID uint, file *multipart.FileHeader)
 	filename := fmt.Sprintf("%d_%s", meetingID, file.Filename)
 	savePath := filepath.Join(s.cfg.UploadDir, filename)
 
-	// Update meeting status
-	meeting.Status = "processing"
+	// Ensure upload directory exists
+	if err := os.MkdirAll(s.cfg.UploadDir, 0755); err != nil {
+		return fmt.Errorf("failed to create upload directory: %w", err)
+	}
+
+	// Open the uploaded file
+	src, err := file.Open()
+	if err != nil {
+		return fmt.Errorf("failed to open uploaded file: %w", err)
+	}
+	defer src.Close()
+
+	// Create destination file
+	dst, err := os.Create(savePath)
+	if err != nil {
+		return fmt.Errorf("failed to create destination file: %w", err)
+	}
+	defer dst.Close()
+
+	// Copy file contents
+	if _, err := io.Copy(dst, src); err != nil {
+		return fmt.Errorf("failed to save file: %w", err)
+	}
+
+	// Update meeting with audio URL
 	meeting.AudioURL = savePath
+	meeting.Status = "processing"
 	_ = s.meetingRepo.Update(meeting)
 
-	// Note: Actual file saving and async processing would happen here
-	// For now we update the meeting record
+	// Transcribe audio using STT service (OpenAI Whisper API)
+	transcript, err := s.sttService.Transcribe(savePath)
+	if err != nil {
+		meeting.Status = "failed"
+		_ = s.meetingRepo.Update(meeting)
+		return fmt.Errorf("transkripsi audio gagal: %w", err)
+	}
+
+	// Save transcript to meeting
+	meeting.Transcript = transcript
+	meeting.Status = "transcribed"
+	_ = s.meetingRepo.Update(meeting)
+
 	return nil
 }
 
@@ -258,6 +295,13 @@ func (s *MeetingService) SendMeetingEmail(meetingID uint, recipients []string, f
 	attachmentPath, err := s.exportSvc.Export(detail, format)
 	if err != nil {
 		return fmt.Errorf("failed to export for email: %w", err)
+	}
+
+	// Check if SMTP is actually configured before trying to send
+	if s.cfg.SMTPUser == "" || s.cfg.SMTPPass == "" {
+		// SMTP not configured - simulate success and return a clear message
+		// The file is still exported as attachment for manual download
+		return fmt.Errorf("Email tidak dapat dikirim: SMTP belum dikonfigurasi. Silakan atur SMTP_USER dan SMTP_PASS di file .env. File export tersimpan di: %s", attachmentPath)
 	}
 
 	return s.emailSvc.SendMinutes(detail.Title, recipients, attachmentPath)

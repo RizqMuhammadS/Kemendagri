@@ -62,6 +62,11 @@ func NewLLMService(cfg *config.Config) *LLMService {
 
 // GenerateMinutes generates structured meeting minutes from cleaned transcript
 func (s *LLMService) GenerateMinutes(meetingTitle string, participants []models.Participant, cleanedText string) (*SummarizeResult, error) {
+	// If no API key configured, use local text extraction fallback
+	if s.cfg.LLMApiKey == "" {
+		return s.localGenerate(meetingTitle, participants, cleanedText), nil
+	}
+
 	prompt := s.buildPrompt(meetingTitle, participants, cleanedText)
 
 	resp, err := s.callLLM(prompt)
@@ -186,6 +191,140 @@ func (s *LLMService) parseResponse(response string) (*SummarizeResult, error) {
 	}
 
 	return &result, nil
+}
+
+// localGenerate provides a fallback summarization without external API
+func (s *LLMService) localGenerate(meetingTitle string, participants []models.Participant, cleanedText string) *SummarizeResult {
+	// Perform basic text extraction: use first 500 chars as summary
+	summary := cleanedText
+	if len(summary) > 500 {
+		summary = summary[:500] + "..."
+	}
+	if summary == "" {
+		summary = "Transkrip rapat tidak tersedia atau kosong."
+	}
+
+	// Split text into sentences for discussion points
+	sentences := splitSentences(cleanedText)
+	discussionPoints := []string{}
+	for i, s := range sentences {
+		if i >= 10 {
+			break
+		}
+		trimmed := s
+		if len(trimmed) > 200 {
+			trimmed = trimmed[:200] + "..."
+		}
+		if trimmed != "" {
+			discussionPoints = append(discussionPoints, trimmed)
+		}
+	}
+	if len(discussionPoints) == 0 {
+		discussionPoints = []string{"Transkrip tidak tersedia untuk dianalisis"}
+	}
+
+	participantNames := ""
+	for i, p := range participants {
+		if i > 0 {
+			participantNames += ", "
+		}
+		participantNames += p.Name
+	}
+	if participantNames == "" {
+		participantNames = "Tidak disebutkan"
+	}
+
+	return &SummarizeResult{
+		Summary:          fmt.Sprintf("Ringkasan Rapat \"%s\"\nPeserta: %s\n\n%s", meetingTitle, participantNames, summary),
+		DiscussionPoints: discussionPoints,
+		Decisions:        []string{"Keputusan tidak dapat diekstrak secara otomatis tanpa AI. Silakan upload transkrip yang lebih lengkap atau konfigurasikan API key LLM."},
+		ActionItems:      []ActionItemResult{},
+	}
+}
+
+// splitSentences splits text into sentence-like chunks
+func splitSentences(text string) []string {
+	var sentences []string
+	current := ""
+	for _, ch := range text {
+		current += string(ch)
+		if ch == '.' || ch == '!' || ch == '?' || ch == '\n' {
+			// Trim whitespace and newlines
+			trimmed := ""
+			for _, c := range current {
+				if c != '\n' && c != '\r' {
+					trimmed += string(c)
+				}
+			}
+			trimmed = ""
+			for _, c := range current {
+				if c == '\n' || c == '\r' {
+					if trimmed != "" {
+						// Avoid adding empty sentences
+						sentences = append(sentences, trimmed)
+					}
+					trimmed = ""
+				} else {
+					trimmed += string(c)
+				}
+			}
+			if trimmed != "" {
+				sentences = append(sentences, trimmed)
+			}
+			current = ""
+		}
+	}
+	if current != "" {
+		trimmed := ""
+		for _, c := range current {
+			if c != '\n' && c != '\r' {
+				trimmed += string(c)
+			}
+		}
+		if trimmed != "" {
+			sentences = append(sentences, trimmed)
+		}
+	}
+	// If no sentence delimiters found, split by words
+	if len(sentences) == 0 && len(text) > 0 {
+		words := []string{}
+		word := ""
+		for _, ch := range text {
+			if ch == ' ' || ch == '\n' || ch == '\r' {
+				if word != "" {
+					words = append(words, word)
+					word = ""
+				}
+			} else {
+				word += string(ch)
+			}
+		}
+		if word != "" {
+			words = append(words, word)
+		}
+		// Group words into ~50 word chunks
+		chunkSize := 50
+		for i := 0; i < len(words); i += chunkSize {
+			end := i + chunkSize
+			if end > len(words) {
+				end = len(words)
+			}
+			sentence := ""
+			for j := i; j < end; j++ {
+				if j > i {
+					sentence += " "
+				}
+				sentence += words[j]
+			}
+			if sentence != "" {
+				sentences = append(sentences, sentence)
+			}
+		}
+	}
+	if len(sentences) == 0 {
+		sentences = append(sentences, text)
+	}
+	return sentences
 }
 
 // extractJSON attempts to extract a JSON object from text

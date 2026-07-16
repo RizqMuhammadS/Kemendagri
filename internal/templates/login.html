@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login - Sistem Notulensi AI</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+    </style>
+</head>
+<body class="bg-gradient-to-br from-indigo-900 to-purple-900 min-h-screen flex items-center justify-center">
+    <div class="bg-white rounded-2xl shadow-2xl p-8 w-full max-w-md mx-4">
+        <div class="text-center mb-8">
+            <i class="fas fa-file-alt text-5xl text-indigo-600 mb-4"></i>
+            <h1 class="text-2xl font-bold text-gray-800">Sistem Notulensi AI</h1>
+            <p class="text-gray-500 mt-2">Masuk ke akun Anda</p>
+        </div>
+
+        <div id="errorMsg" class="bg-red-100 text-red-700 px-4 py-2 rounded mb-4 hidden"></div>
+
+        <form id="loginForm">
+            <div class="mb-4">
+                <label class="block text-gray-700 text-sm font-semibold mb-2">Email</label>
+                <div class="relative">
+                    <i class="fas fa-envelope absolute left-3 top-3 text-gray-400"></i>
+                    <input type="email" id="email" required
+                        class="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                        placeholder="nama@email.com">
+                </div>
+            </div>
+
+            <div class="mb-6">
+                <label class="block text-gray-700 text-sm font-semibold mb-2">Password</label>
+                <div class="relative">
+                    <i class="fas fa-lock absolute left-3 top-3 text-gray-400"></i>
+                    <input type="password" id="password" required
+                        class="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                        placeholder="●●●●●●●●">
+                </div>
+            </div>
+
+            <button type="submit"
+                class="w-full bg-indigo-600 text-white py-2 rounded-lg font-semibold hover:bg-indigo-700 transition duration-200">
+                <i class="fas fa-sign-in-alt mr-2"></i>Masuk
+            </button>
+        </form>
+
+        <p class="text-center mt-6 text-gray-500">
+            Belum punya akun?
+            <a href="/register" class="text-indigo-600 hover:underline font-semibold">Daftar</a>
+        </p>
+    </div>
+
+    <script>
+        const API_BASE = '/api';
+        function getToken() { return localStorage.getItem('token'); }
+        async function apiRequest(method, path, data) {
+            const headers = { 'Content-Type': 'application/json' };
+            const token = getToken();
+            if (token) headers['Authorization'] = 'Bearer ' + token;
+            const config = { method, headers };
+            if (data) config.body = JSON.stringify(data);
+            const res = await fetch(API_BASE + path, config);
+            return await res.json();
+        }
+        function showAlert(msg, type) {
+            const div = document.createElement('div');
+            div.className = 'fixed top-4 right-4 px-6 py-3 rounded shadow-lg text-white z-50 ' + (type === 'success' ? 'bg-green-500' : type === 'error' ? 'bg-red-500' : 'bg-blue-500');
+            div.innerHTML = msg;
+            document.body.appendChild(div);
+            setTimeout(() => div.remove(), 3000);
+        }
+
+        document.getElementById('loginForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const email = document.getElementById('email').value;
+            const password = document.getElementById('password').value;
+            const errorDiv = document.getElementById('errorMsg');
+            try {
+                const res = await apiRequest('POST', '/auth/login', { email, password });
+                if (res.success) {
+                    localStorage.setItem('token', res.data.token);
+                    localStorage.setItem('user', JSON.stringify(res.data.user));
+                    window.location.href = '/dashboard';
+                } else {
+                    errorDiv.textContent = res.error || 'Login gagal';
+                    errorDiv.classList.remove('hidden');
+                }
+            } catch (err) {
+                errorDiv.textContent = 'Terjadi kesalahan koneksi';
+                errorDiv.classList.remove('hidden');
+            }
+        });
+    </script>
+</body>
+</html>

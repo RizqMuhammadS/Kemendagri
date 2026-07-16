@@ -6,12 +6,16 @@ import (
 	"os"
 
 	"github.com/gin-gonic/gin"
+	_ "github.com/yourusername/meeting-minutes-ai/docs"
 	"github.com/yourusername/meeting-minutes-ai/internal/config"
 	"github.com/yourusername/meeting-minutes-ai/internal/controllers"
 	"github.com/yourusername/meeting-minutes-ai/internal/middleware"
+	"github.com/yourusername/meeting-minutes-ai/internal/models"
 	"github.com/yourusername/meeting-minutes-ai/internal/repositories"
 	"github.com/yourusername/meeting-minutes-ai/internal/routes"
 	"github.com/yourusername/meeting-minutes-ai/internal/services"
+	"gorm.io/driver/postgres"
+	"gorm.io/gorm"
 )
 
 // @title Meeting Minutes AI API
@@ -46,9 +50,34 @@ func main() {
 		log.Fatalf("Failed to create export directory: %v", err)
 	}
 
-	// Initialize repositories (using in-memory for development)
-	userRepo := repositories.NewInMemoryUserRepository()
-	meetingRepo := repositories.NewInMemoryMeetingRepository()
+	// Connect to PostgreSQL database
+	dsn := fmt.Sprintf("host=%s port=%d user=%s password=%s dbname=%s sslmode=%s",
+		cfg.DBHost, cfg.DBPort, cfg.DBUser, cfg.DBPassword, cfg.DBName, cfg.DBSSLMode)
+
+	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{})
+	if err != nil {
+		log.Fatalf("Failed to connect to database: %v", err)
+	}
+
+	log.Println("Connected to PostgreSQL database")
+
+	// Auto-migrate database schemas
+	if err := db.AutoMigrate(
+		&models.User{},
+		&models.Meeting{},
+		&models.Participant{},
+		&models.DiscussionPoint{},
+		&models.Decision{},
+		&models.ActionItem{},
+	); err != nil {
+		log.Fatalf("Failed to migrate database: %v", err)
+	}
+
+	log.Println("Database migration completed")
+
+	// Initialize repositories (using PostgreSQL with GORM)
+	userRepo := repositories.NewUserRepository(db)
+	meetingRepo := repositories.NewMeetingRepository(db)
 
 	// Initialize services
 	authService := services.NewAuthService(userRepo, cfg)

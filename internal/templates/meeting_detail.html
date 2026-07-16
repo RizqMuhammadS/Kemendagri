@@ -1,0 +1,526 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Detail Rapat - Sistem Notulensi AI</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        .sidebar { min-height: 100vh; }
+        @media (max-width: 768px) { .sidebar { min-height: auto; } }
+    </style>
+</head>
+<body class="bg-gray-100">
+    <div class="flex flex-col md:flex-row">
+        <aside class="sidebar bg-indigo-800 text-white w-full md:w-64 p-4">
+            <div class="text-xl font-bold mb-8">
+                <i class="fas fa-file-alt mr-2"></i>Notulensi AI
+            </div>
+            <nav>
+                <a href="/dashboard" class="flex items-center py-2 px-4 rounded hover:bg-indigo-700 mb-1">
+                    <i class="fas fa-tachometer-alt w-6"></i> Dashboard
+                </a>
+                <a href="/meetings" class="flex items-center py-2 px-4 rounded hover:bg-indigo-700 mb-1">
+                    <i class="fas fa-list w-6"></i> Daftar Rapat
+                </a>
+                <a href="/meetings/create" class="flex items-center py-2 px-4 rounded hover:bg-indigo-700 mb-1">
+                    <i class="fas fa-plus-circle w-6"></i> Buat Rapat
+                </a>
+                <hr class="my-4 border-indigo-600">
+                <div id="userName" class="text-sm px-4 mb-2 opacity-75">User</div>
+                <button onclick="logout()" class="flex items-center py-2 px-4 rounded hover:bg-red-600 w-full text-left">
+                    <i class="fas fa-sign-out-alt w-6"></i> Logout
+                </button>
+            </nav>
+        </aside>
+
+        <main class="flex-1 p-6">
+            <div class="max-w-4xl mx-auto">
+                <a href="/meetings" class="text-indigo-600 hover:underline mb-4 inline-block">
+                    <i class="fas fa-arrow-left mr-1"></i>Kembali ke daftar rapat
+                </a>
+
+                <div id="meetingLoading" class="text-center py-12">
+                    <i class="fas fa-spinner fa-spin text-4xl text-indigo-600 mb-4"></i>
+                    <p class="text-gray-500">Memuat detail rapat...</p>
+                </div>
+
+                <div id="meetingContent" class="hidden">
+                    <!-- Meeting Header -->
+                    <div class="bg-white rounded-lg shadow p-6 mb-6">
+                        <div class="flex justify-between items-start">
+                            <div>
+                                <h1 id="meetingTitle" class="text-2xl font-bold text-gray-800 mb-2"></h1>
+                                <div class="text-gray-500 space-y-1">
+                                    <p id="meetingDate"><i class="fas fa-calendar mr-2"></i></p>
+                                    <p id="meetingLocation"><i class="fas fa-map-marker-alt mr-2"></i></p>
+                                    <p id="meetingOrganizer"><i class="fas fa-user mr-2"></i></p>
+                                    <p id="meetingStatus"></p>
+                                </div>
+                            </div>
+                            <span id="statusBadge" class="px-3 py-1 text-sm rounded-full font-medium"></span>
+                        </div>
+                    </div>
+
+                    <!-- Participants -->
+                    <div class="bg-white rounded-lg shadow p-6 mb-6">
+                        <h2 class="text-xl font-semibold text-gray-800 mb-4">
+                            <i class="fas fa-users mr-2 text-indigo-600"></i>Peserta Rapat
+                        </h2>
+                        <div id="participantsList"></div>
+                    </div>
+
+                    <!-- Transcript Input -->
+                    <div class="bg-white rounded-lg shadow p-6 mb-6">
+                        <h2 class="text-xl font-semibold text-gray-800 mb-4">
+                            <i class="fas fa-microphone mr-2 text-indigo-600"></i>Transkrip Rapat
+                        </h2>
+                        <div id="transcriptionSection">
+                            <p class="text-gray-500 mb-4">
+                                Masukkan transkrip rapat secara manual (copy-paste dari hasil rekaman) 
+                                atau upload file audio sebagai referensi.
+                            </p>
+                            <textarea id="transcriptInput" rows="10" 
+                                class="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm font-mono"
+                                placeholder="Ketik atau paste transkrip rapat di sini...&#10;&#10;Contoh:&#10;Moderator: Selamat pagi, kita mulai rapat hari ini...&#10;Agus: Saya ingin membahas progres proyek...&#10;Budi: Untuk target Q2 sudah mencapai 75%..."></textarea>
+                            <div class="flex flex-wrap gap-3 mt-4">
+                                <div class="border-2 border-dashed border-gray-300 rounded-lg p-4 text-center flex-1 min-w-[200px]">
+                                    <input type="file" id="audioFile" accept="audio/*" class="hidden">
+                                    <button onclick="document.getElementById('audioFile').click()" class="bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 text-sm">
+                                        <i class="fas fa-upload mr-2"></i>Upload Audio
+                                    </button>
+                                    <p id="fileName" class="mt-2 text-xs text-gray-500"></p>
+                                    <button id="uploadBtn" onclick="uploadAudio()" class="hidden mt-2 bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 text-sm">
+                                        <i class="fas fa-cloud-upload-alt mr-2"></i>Upload
+                                    </button>
+                                </div>
+                                <button id="processTranscriptBtn" onclick="processTranscript()" class="bg-indigo-600 text-white px-6 py-2 rounded-lg hover:bg-indigo-700 self-end">
+                                    <i class="fas fa-magic mr-2"></i>Generate Notulensi AI
+                                </button>
+                            </div>
+                            <div id="transcriptResult" class="mt-4 hidden">
+                                <h3 class="font-semibold text-gray-700 mb-2">Transkrip Tersimpan:</h3>
+                                <pre id="transcriptText" class="bg-gray-50 p-4 rounded-lg text-sm whitespace-pre-wrap border"></pre>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- AI Summary -->
+                    <div class="bg-white rounded-lg shadow p-6 mb-6">
+                        <h2 class="text-xl font-semibold text-gray-800 mb-4">
+                            <i class="fas fa-file-alt mr-2 text-indigo-600"></i>Ringkasan / Notulensi AI
+                        </h2>
+                        <div id="summarySection">
+                            <div id="summaryContent" class="prose max-w-none"></div>
+                        </div>
+                    </div>
+
+                    <!-- Discussion Points -->
+                    <div class="bg-white rounded-lg shadow p-6 mb-6">
+                        <h2 class="text-xl font-semibold text-gray-800 mb-4">
+                            <i class="fas fa-comments mr-2 text-indigo-600"></i>Poin Diskusi
+                        </h2>
+                        <div id="discussionPoints"></div>
+                    </div>
+
+                    <!-- Decisions -->
+                    <div class="bg-white rounded-lg shadow p-6 mb-6">
+                        <h2 class="text-xl font-semibold text-gray-800 mb-4">
+                            <i class="fas fa-gavel mr-2 text-indigo-600"></i>Keputusan
+                        </h2>
+                        <div id="decisions"></div>
+                    </div>
+
+                    <!-- Action Items -->
+                    <div class="bg-white rounded-lg shadow p-6 mb-6">
+                        <h2 class="text-xl font-semibold text-gray-800 mb-4">
+                            <i class="fas fa-tasks mr-2 text-indigo-600"></i>Tindak Lanjut
+                        </h2>
+                        <div id="actionItems"></div>
+                    </div>
+
+                    <!-- Export & Email -->
+                    <div class="bg-white rounded-lg shadow p-6">
+                        <h2 class="text-xl font-semibold text-gray-800 mb-4">
+                            <i class="fas fa-share-alt mr-2 text-indigo-600"></i>Export & Bagikan
+                        </h2>
+                        <div class="flex flex-wrap gap-3">
+                            <button onclick="exportMeeting('pdf')" class="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700">
+                                <i class="fas fa-file-pdf mr-2"></i>Export PDF
+                            </button>
+                            <button onclick="exportMeeting('word')" class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700">
+                                <i class="fas fa-file-word mr-2"></i>Export Word
+                            </button>
+                            <button onclick="showEmailModal()" class="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700">
+                                <i class="fas fa-envelope mr-2"></i>Kirim Email
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Email Modal -->
+    <div id="emailModal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50">
+        <div class="bg-white rounded-lg p-6 w-full max-w-md mx-4">
+            <h3 class="text-lg font-semibold mb-4">Kirim Notulensi via Email</h3>
+            <div class="space-y-3">
+                <div>
+                    <label class="block text-sm font-semibold mb-1">Email Tujuan (pisahkan dengan koma)</label>
+                    <input type="text" id="emailTo" class="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500" placeholder="email1@tujuan.com, email2@tujuan.com">
+                </div>
+                <div>
+                    <label class="block text-sm font-semibold mb-1">Format</label>
+                    <select id="emailFormat" class="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                        <option value="pdf">PDF</option>
+                        <option value="word">Word</option>
+                    </select>
+                </div>
+            </div>
+            <div class="flex justify-end gap-3 mt-6">
+                <button onclick="closeEmailModal()" class="px-4 py-2 border rounded-lg hover:bg-gray-50">Batal</button>
+                <button onclick="sendEmail()" class="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700">Kirim</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = '/api';
+        function getToken() { return localStorage.getItem('token'); }
+        async function apiRequest(method, path, data) {
+            const headers = { 'Content-Type': 'application/json' };
+            const token = getToken();
+            if (token) headers['Authorization'] = 'Bearer ' + token;
+            const config = { method, headers };
+            if (data) config.body = JSON.stringify(data);
+            const res = await fetch(API_BASE + path, config);
+            const json = await res.json();
+            if (!json.success && res.status === 401) {
+                localStorage.removeItem('token');
+                localStorage.removeItem('user');
+                window.location.href = '/login';
+            }
+            return json;
+        }
+        function logout() {
+            localStorage.removeItem('token');
+            localStorage.removeItem('user');
+            window.location.href = '/login';
+        }
+        function showAlert(msg, type) {
+            const div = document.createElement('div');
+            div.className = 'fixed top-4 right-4 px-6 py-3 rounded shadow-lg text-white z-50 ' + (type === 'success' ? 'bg-green-500' : type === 'error' ? 'bg-red-500' : 'bg-blue-500');
+            div.innerHTML = msg;
+            document.body.appendChild(div);
+            setTimeout(() => div.remove(), 3000);
+        }
+
+        let meetingId = null;
+        let meetingData = null;
+        let selectedFile = null;
+
+        document.getElementById('audioFile').addEventListener('change', function(e) {
+            selectedFile = e.target.files[0];
+            if (selectedFile) {
+                document.getElementById('fileName').textContent = selectedFile.name;
+                document.getElementById('uploadBtn').classList.remove('hidden');
+            }
+        });
+
+        function showEmailModal() {
+            document.getElementById('emailModal').classList.remove('hidden');
+            document.getElementById('emailModal').classList.add('flex');
+        }
+
+        function closeEmailModal() {
+            document.getElementById('emailModal').classList.add('hidden');
+            document.getElementById('emailModal').classList.remove('flex');
+        }
+
+        async function uploadAudio() {
+            if (!selectedFile) { showAlert('Pilih file audio terlebih dahulu', 'error'); return; }
+            const formData = new FormData();
+            formData.append('audio', selectedFile);
+            formData.append('meeting_id', meetingId);
+
+            const btn = document.getElementById('uploadBtn');
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Memproses...';
+
+            try {
+                const token = getToken();
+                const res = await fetch(API_BASE + '/meetings/upload-audio', {
+                    method: 'POST',
+                    headers: { 'Authorization': 'Bearer ' + token },
+                    body: formData
+                });
+                const json = await res.json();
+                if (json.success) {
+                    showAlert('Audio berhasil diupload!', 'success');
+                    loadMeeting();
+                } else {
+                    showAlert(json.error || 'Gagal upload audio', 'error');
+                }
+            } catch (err) {
+                showAlert('Gagal upload audio', 'error');
+            }
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fas fa-cloud-upload-alt mr-2"></i>Upload & Transkrip';
+        }
+
+        async function processTranscript() {
+            // Read transcript from textarea (manual input)
+            const transcript = document.getElementById('transcriptInput').value.trim();
+            if (!transcript) {
+                showAlert('Silakan masukkan transkrip rapat terlebih dahulu!', 'error');
+                document.getElementById('processTranscriptBtn').disabled = false;
+                return;
+            }
+
+            const btn = document.getElementById('processTranscriptBtn');
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Memproses...';
+
+            try {
+                const headers = { 'Content-Type': 'application/json' };
+                const token = getToken();
+                if (token) headers['Authorization'] = 'Bearer ' + token;
+                const res = await fetch(API_BASE + '/meetings/process-transcript', {
+                    method: 'POST',
+                    headers: headers,
+                    body: JSON.stringify({
+                        meeting_id: meetingId,
+                        transcript: transcript
+                    })
+                });
+                const json = await res.json();
+                if (json.success) {
+                    showAlert('Notulensi berhasil digenerate!', 'success');
+                    loadMeeting();
+                } else {
+                    showAlert(json.error || 'Gagal proses transkrip', 'error');
+                    console.error('processTranscript error:', json);
+                }
+            } catch (err) {
+                showAlert('Gagal proses transkrip: ' + err.message, 'error');
+                console.error('processTranscript exception:', err);
+            }
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fas fa-magic mr-2"></i>Generate Notulensi AI';
+        }
+
+        async function exportMeeting(format) {
+            try {
+                const token = getToken();
+                const res = await fetch(API_BASE + '/meetings/export', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': 'Bearer ' + token
+                    },
+                    body: JSON.stringify({ meeting_id: meetingId, format })
+                });
+                if (res.ok) {
+                    // Try to get filename from Content-Disposition header
+                    const disposition = res.headers.get('Content-Disposition');
+                    let filename = 'notulensi.' + (format === 'pdf' ? 'pdf' : 'doc');
+                    if (disposition) {
+                        const match = disposition.match(/filename="(.+?)"/);
+                        if (match) filename = match[1];
+                    }
+                    const blob = await res.blob();
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = filename;
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                    URL.revokeObjectURL(url);
+                    showAlert('File berhasil diunduh!', 'success');
+                } else {
+                    const json = await res.json();
+                    showAlert(json.error || 'Gagal export', 'error');
+                }
+            } catch (err) {
+                showAlert('Gagal export: ' + err.message, 'error');
+            }
+        }
+
+        async function sendEmail() {
+            const emailInput = document.getElementById('emailTo').value;
+            const format = document.getElementById('emailFormat').value;
+            if (!emailInput) { showAlert('Masukkan email tujuan', 'error'); return; }
+
+            // Support comma-separated emails
+            const recipients = emailInput.split(',').map(e => e.trim()).filter(e => e);
+
+            try {
+                const res = await apiRequest('POST', '/meetings/send-email', {
+                    meeting_id: meetingId,
+                    recipients: recipients,
+                    format: format
+                });
+                if (res.success) {
+                    showAlert('Email berhasil dikirim!', 'success');
+                    closeEmailModal();
+                } else {
+                    showAlert(res.error || 'Gagal kirim email', 'error');
+                }
+            } catch (err) {
+                showAlert('Gagal kirim email', 'error');
+            }
+        }
+
+        async function loadMeeting() {
+            try {
+                const res = await apiRequest('GET', '/meetings/' + meetingId);
+                if (res.success) {
+                    meetingData = res.data;
+                    renderMeeting(res.data);
+                } else {
+                    document.getElementById('meetingLoading').innerHTML = '<p class="text-red-500">Rapat tidak ditemukan</p>';
+                }
+            } catch (err) {
+                document.getElementById('meetingLoading').innerHTML = '<p class="text-red-500">Gagal memuat data rapat</p>';
+            }
+        }
+
+        function renderMeeting(d) {
+            document.getElementById('meetingLoading').classList.add('hidden');
+            document.getElementById('meetingContent').classList.remove('hidden');
+
+            document.getElementById('meetingTitle').textContent = d.title || 'Rapat';
+
+            // Format date nicely
+            let dateStr = d.date || '-';
+            document.getElementById('meetingDate').innerHTML = '<i class="fas fa-calendar mr-2"></i>Tanggal: ' + dateStr;
+            document.getElementById('meetingLocation').innerHTML = '<i class="fas fa-map-marker-alt mr-2"></i>Lokasi: ' + (d.location || '-');
+            document.getElementById('meetingOrganizer').innerHTML = '<i class="fas fa-user mr-2"></i>Penyelenggara ID: ' + (d.organizer_id || '-');
+
+            const statusEl = document.getElementById('meetingStatus');
+            const status = d.status || 'pending';
+            const statusMap = { 'completed': 'Selesai', 'processing': 'Diproses', 'pending': 'Menunggu', 'failed': 'Gagal' };
+            statusEl.innerHTML = '<i class="fas fa-info-circle mr-1"></i>Status: ' + (statusMap[status] || status);
+
+            const statusBadge = document.getElementById('statusBadge');
+            const colors = {
+                'completed': 'bg-green-100 text-green-700',
+                'processing': 'bg-yellow-100 text-yellow-700',
+                'pending': 'bg-gray-100 text-gray-600',
+                'failed': 'bg-red-100 text-red-700'
+            };
+            statusBadge.className = 'px-3 py-1 text-sm rounded-full font-medium ' + (colors[status] || 'bg-gray-100 text-gray-600');
+            statusBadge.textContent = statusMap[status] || status;
+
+            // Participants
+            const participantsDiv = document.getElementById('participantsList');
+            if (d.participants && d.participants.length > 0) {
+                participantsDiv.innerHTML = d.participants.map(p => `
+                    <div class="flex items-center py-2 border-b last:border-b-0">
+                        <div class="w-10 h-10 bg-indigo-100 rounded-full flex items-center justify-center text-indigo-600 font-bold mr-3">
+                            ${(p.name || '?')[0].toUpperCase()}
+                        </div>
+                        <div>
+                            <div class="font-medium text-gray-800">${p.name}</div>
+                            <div class="text-sm text-gray-500">${p.email || ''} ${p.role ? '| ' + p.role : ''}</div>
+                        </div>
+                    </div>
+                `).join('');
+            } else {
+                participantsDiv.innerHTML = '<p class="text-gray-500">Belum ada peserta.</p>';
+            }
+
+            // Transcript - show saved transcript and populate textarea
+            if (d.transcript) {
+                document.getElementById('transcriptResult').classList.remove('hidden');
+                document.getElementById('transcriptText').textContent = d.transcript;
+                document.getElementById('transcriptInput').value = d.transcript;
+            }
+
+            // Summary
+            const summaryDiv = document.getElementById('summaryContent');
+            const processBtn = document.getElementById('processTranscriptBtn');
+            if (d.summary) {
+                summaryDiv.innerHTML = d.summary.replace(/\n/g, '<br>');
+                processBtn.classList.add('hidden');
+            } else {
+                summaryDiv.innerHTML = '<p class="text-gray-500">Notulensi belum digenerate. Masukkan transkrip rapat di atas, lalu klik tombol "Generate Notulensi AI".</p>';
+                processBtn.classList.remove('hidden');
+            }
+
+            // Discussion Points
+            const dpDiv = document.getElementById('discussionPoints');
+            if (d.discussion_points && d.discussion_points.length > 0) {
+                dpDiv.innerHTML = d.discussion_points.map(p => `
+                    <div class="flex items-start p-3 border rounded-lg mb-2 bg-gray-50">
+                        <span class="bg-indigo-600 text-white rounded-full w-6 h-6 flex items-center justify-center text-sm font-bold mr-3 flex-shrink-0">${p.sequence || '•'}</span>
+                        <div>
+                            <div class="text-gray-800">${p.point}</div>
+                            ${p.speaker ? '<div class="text-sm text-gray-500 mt-1">— ' + p.speaker + '</div>' : ''}
+                        </div>
+                    </div>
+                `).join('');
+            } else {
+                dpDiv.innerHTML = '<p class="text-gray-500">Belum ada poin diskusi.</p>';
+            }
+
+            // Decisions
+            const decDiv = document.getElementById('decisions');
+            if (d.decisions && d.decisions.length > 0) {
+                decDiv.innerHTML = d.decisions.map(dec => `
+                    <div class="flex items-start p-3 border rounded-lg mb-2 bg-green-50">
+                        <i class="fas fa-check-circle text-green-600 mt-1 mr-3"></i>
+                        <div class="text-gray-800">${dec.decision}</div>
+                    </div>
+                `).join('');
+            } else {
+                decDiv.innerHTML = '<p class="text-gray-500">Belum ada keputusan.</p>';
+            }
+
+            // Action Items
+            const actionsDiv = document.getElementById('actionItems');
+            if (d.action_items && d.action_items.length > 0) {
+                actionsDiv.innerHTML = d.action_items.map(item => `
+                    <div class="flex items-start p-3 border rounded-lg mb-2">
+                        <div class="w-5 h-5 border-2 border-gray-300 rounded mt-1 mr-3 flex-shrink-0 ${item.status === 'completed' ? 'bg-green-500 border-green-500' : ''}">
+                            ${item.status === 'completed' ? '<i class="fas fa-check text-white text-xs flex items-center justify-center h-full"></i>' : ''}
+                        </div>
+                        <div>
+                            <div class="${item.status === 'completed' ? 'line-through text-gray-400' : 'text-gray-800'}">${item.task}</div>
+                            <div class="text-sm text-gray-500">
+                                ${item.assignee ? 'PIC: ' + item.assignee : ''}
+                                ${item.deadline ? ' | Deadline: ' + item.deadline : ''}
+                                ${item.status ? ' | Status: ' + item.status : ''}
+                            </div>
+                        </div>
+                    </div>
+                `).join('');
+            } else {
+                actionsDiv.innerHTML = '<p class="text-gray-500">Belum ada tindak lanjut.</p>';
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', function() {
+            const user = JSON.parse(localStorage.getItem('user') || '{}');
+            if (!user.id) { window.location.href = '/login'; return; }
+            document.getElementById('userName').textContent = user.name || 'User';
+
+            // Extract meeting ID from URL
+            const pathParts = window.location.pathname.split('/');
+            if (pathParts.length >= 3 && pathParts[1] === 'meetings') {
+                const id = parseInt(pathParts[2]);
+                if (id) {
+                    meetingId = id;
+                    loadMeeting();
+                } else {
+                    document.getElementById('meetingLoading').innerHTML = '<p class="text-red-500">ID rapat tidak valid</p>';
+                }
+            }
+        });
+    </script>
+</body>
+</html>
