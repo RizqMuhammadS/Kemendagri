@@ -82,6 +82,8 @@ func SetupRouter(
 				meetings.POST("/process-transcript", meetingCtrl.ProcessTranscript)
 				meetings.POST("/export", meetingCtrl.ExportMeeting)
 				meetings.POST("/send-email", meetingCtrl.SendEmail)
+				meetings.PUT("/:id", meetingCtrl.UpdateMeeting)
+				meetings.DELETE("/:id", meetingCtrl.DeleteMeeting)
 			}
 
 			// Dashboard

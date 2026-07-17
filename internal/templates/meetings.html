@@ -10,6 +10,9 @@
         body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
         .sidebar { min-height: 100vh; }
         @media (max-width: 768px) { .sidebar { min-height: auto; } }
+        .meeting-card:hover .delete-btn { opacity: 1; }
+        .delete-btn { opacity: 0; transition: opacity 0.2s; }
+        .status-badge { font-size: 0.75rem; }
     </style>
 </head>
 <body class="bg-gray-100">
@@ -37,22 +40,31 @@
         </aside>
 
         <main class="flex-1 p-6">
-            <div class="max-w-6xl mx-auto">
+            <div class="max-w-4xl mx-auto">
                 <div class="flex justify-between items-center mb-6">
-                    <h1 class="text-3xl font-bold text-gray-800">Daftar Rapat</h1>
-                    <a href="/meetings/create" class="bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 transition">
-                        <i class="fas fa-plus mr-2"></i>Buat Rapat
+                    <h1 class="text-2xl font-bold text-gray-800">
+                        <i class="fas fa-list mr-2 text-indigo-600"></i>Daftar Rapat
+                    </h1>
+                    <a href="/meetings/create" class="bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 text-sm">
+                        <i class="fas fa-plus mr-1"></i>Buat Rapat Baru
                     </a>
                 </div>
 
-                <div class="bg-white rounded-lg shadow overflow-hidden">
-                    <div id="meetingsList" class="divide-y">
-                        <div class="p-6 text-center text-gray-500">
-                            <i class="fas fa-spinner fa-spin text-2xl mb-2"></i>
-                            <p>Memuat data...</p>
-                        </div>
-                    </div>
+                <div id="loading" class="text-center py-12">
+                    <i class="fas fa-spinner fa-spin text-4xl text-indigo-600 mb-4"></i>
+                    <p class="text-gray-500">Memuat daftar rapat...</p>
                 </div>
+
+                <div id="meetingList" class="hidden space-y-4"></div>
+
+                <div id="emptyState" class="hidden text-center py-12 bg-white rounded-lg shadow">
+                    <i class="fas fa-folder-open text-5xl text-gray-300 mb-4"></i>
+                    <p class="text-gray-500 text-lg">Belum ada rapat</p>
+                    <a href="/meetings/create" class="text-indigo-600 hover:underline mt-2 inline-block">Buat rapat baru</a>
+                </div>
+
+                <!-- Pagination -->
+                <div id="pagination" class="hidden flex justify-center items-center gap-4 mt-6"></div>
             </div>
         </main>
     </div>
@@ -60,6 +72,7 @@
     <script>
         const API_BASE = '/api';
         function getToken() { return localStorage.getItem('token'); }
+
         async function apiRequest(method, path, data) {
             const headers = { 'Content-Type': 'application/json' };
             const token = getToken();
@@ -67,7 +80,14 @@
             const config = { method, headers };
             if (data) config.body = JSON.stringify(data);
             const res = await fetch(API_BASE + path, config);
-            const json = await res.json();
+            let json;
+            const contentType = res.headers.get('content-type') || '';
+            if (contentType.includes('application/json')) {
+                json = await res.json();
+            } else {
+                const text = await res.text();
+                json = { success: false, error: text || 'Unknown error (status ' + res.status + ')' };
+            }
             if (!json.success && res.status === 401) {
                 localStorage.removeItem('token');
                 localStorage.removeItem('user');
@@ -75,11 +95,13 @@
             }
             return json;
         }
+
         function logout() {
             localStorage.removeItem('token');
             localStorage.removeItem('user');
             window.location.href = '/login';
         }
+
         function showAlert(msg, type) {
             const div = document.createElement('div');
             div.className = 'fixed top-4 right-4 px-6 py-3 rounded shadow-lg text-white z-50 ' + (type === 'success' ? 'bg-green-500' : type === 'error' ? 'bg-red-500' : 'bg-blue-500');
@@ -88,50 +110,136 @@
             setTimeout(() => div.remove(), 3000);
         }
 
-        document.addEventListener('DOMContentLoaded', async () => {
+        let currentPage = 1;
+        let totalMeetings = 0;
+        const pageSize = 10;
+
+        async function loadMeetings(page = 1) {
+            document.getElementById('loading').classList.remove('hidden');
+            document.getElementById('meetingList').classList.add('hidden');
+            document.getElementById('emptyState').classList.add('hidden');
+            document.getElementById('pagination').classList.add('hidden');
+
+            try {
+                const res = await apiRequest('GET', '/meetings?page=' + page + '&page_size=' + pageSize);
+                if (res.success) {
+                    const meetings = res.data.meetings || [];
+                    totalMeetings = res.data.total || 0;
+                    const container = document.getElementById('meetingList');
+                    container.innerHTML = '';
+
+                    if (meetings.length === 0) {
+                        document.getElementById('emptyState').classList.remove('hidden');
+                    } else {
+                        meetings.forEach(m => {
+                            const card = document.createElement('div');
+                            card.className = 'meeting-card bg-white rounded-lg shadow p-4 hover:shadow-md transition flex justify-between items-start';
+                            card.id = 'meeting-' + m.id;
+                            const statusMap = { 'completed': 'Selesai', 'processing': 'Diproses', 'pending': 'Menunggu', 'failed': 'Gagal', 'transcribed': 'Tertranskrip' };
+                            const statusColors = { 'completed': 'bg-green-100 text-green-700', 'processing': 'bg-yellow-100 text-yellow-700', 'pending': 'bg-gray-100 text-gray-600', 'failed': 'bg-red-100 text-red-700', 'transcribed': 'bg-blue-100 text-blue-700' };
+                            const status = m.status || 'pending';
+                            card.innerHTML = `
+                                <a href="/meetings/${m.id}" class="flex-1 min-w-0">
+                                    <h3 class="font-semibold text-gray-800 truncate">${m.title || 'Rapat'}</h3>
+                                    <div class="text-sm text-gray-500 mt-1 flex flex-wrap gap-x-4">
+                                        <span><i class="fas fa-calendar mr-1"></i>${m.date || '-'}</span>
+                                        <span><i class="fas fa-map-marker-alt mr-1"></i>${m.location || '-'}</span>
+                                    </div>
+                                </a>
+                                <div class="flex items-center gap-2 flex-shrink-0 ml-2">
+                                    <span class="status-badge px-2 py-1 rounded-full font-medium ${statusColors[status] || 'bg-gray-100 text-gray-600'}">${statusMap[status] || status}</span>
+                                    <button onclick="deleteMeeting(${m.id}, '${m.title ? m.title.replace(/'/g, "\\'") : 'Rapat'}')" class="delete-btn p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition" title="Hapus rapat">
+                                        <i class="fas fa-trash"></i>
+                                    </button>
+                                </div>
+                            `;
+                            container.appendChild(card);
+                        });
+                        container.classList.remove('hidden');
+                        renderPagination();
+                    }
+                } else {
+                    document.getElementById('meetingList').innerHTML = '<p class="text-red-500 text-center">Gagal memuat data: ' + (res.error || 'Unknown error') + '</p>';
+                    document.getElementById('meetingList').classList.remove('hidden');
+                }
+            } catch (err) {
+                document.getElementById('meetingList').innerHTML = '<p class="text-red-500 text-center">Gagal memuat data: ' + err.message + '</p>';
+                document.getElementById('meetingList').classList.remove('hidden');
+            }
+            document.getElementById('loading').classList.add('hidden');
+        }
+
+        function renderPagination() {
+            const totalPages = Math.ceil(totalMeetings / pageSize);
+            if (totalPages <= 1) return;
+
+            const container = document.getElementById('pagination');
+            container.innerHTML = '';
+            container.classList.remove('hidden');
+
+            const prevBtn = document.createElement('button');
+            prevBtn.innerHTML = '<i class="fas fa-chevron-left mr-1"></i> Sebelumnya';
+            prevBtn.className = 'px-4 py-2 border rounded-lg text-sm ' + (currentPage <= 1 ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : 'hover:bg-gray-50');
+            prevBtn.disabled = currentPage <= 1;
+            prevBtn.onclick = () => { if (currentPage > 1) { currentPage--; loadMeetings(currentPage); } };
+            container.appendChild(prevBtn);
+
+            const pageInfo = document.createElement('span');
+            pageInfo.className = 'text-sm text-gray-600';
+            pageInfo.textContent = 'Halaman ' + currentPage + ' dari ' + totalPages;
+            container.appendChild(pageInfo);
+
+            const nextBtn = document.createElement('button');
+            nextBtn.innerHTML = 'Selanjutnya <i class="fas fa-chevron-right ml-1"></i>';
+            nextBtn.className = 'px-4 py-2 border rounded-lg text-sm ' + (currentPage >= totalPages ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : 'hover:bg-gray-50');
+            nextBtn.disabled = currentPage >= totalPages;
+            nextBtn.onclick = () => { if (currentPage < totalPages) { currentPage++; loadMeetings(currentPage); } };
+            container.appendChild(nextBtn);
+        }
+
+        async function deleteMeeting(id, title) {
+            if (!confirm(`Apakah Anda yakin ingin menghapus rapat "${title}"? Data yang sudah dihapus tidak dapat dikembalikan.`)) return;
+
+            const card = document.getElementById('meeting-' + id);
+            if (card) {
+                card.style.opacity = '0.5';
+                card.style.pointerEvents = 'none';
+            }
+
+            try {
+                const res = await apiRequest('DELETE', '/meetings/' + id);
+                if (res.success) {
+                    showAlert('✅ Rapat "' + title + '" berhasil dihapus', 'success');
+                    // Remove card from DOM
+                    if (card) card.remove();
+                    // Check if list is empty
+                    const container = document.getElementById('meetingList');
+                    if (container.children.length === 0) {
+                        container.classList.add('hidden');
+                        document.getElementById('emptyState').classList.remove('hidden');
+                        document.getElementById('pagination').classList.add('hidden');
+                    }
+                } else {
+                    showAlert('❌ ' + (res.error || 'Gagal menghapus rapat'), 'error');
+                    if (card) {
+                        card.style.opacity = '1';
+                        card.style.pointerEvents = 'auto';
+                    }
+                }
+            } catch (err) {
+                showAlert('❌ Gagal menghapus rapat: ' + err.message, 'error');
+                if (card) {
+                    card.style.opacity = '1';
+                    card.style.pointerEvents = 'auto';
+                }
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', function() {
             const user = JSON.parse(localStorage.getItem('user') || '{}');
             if (!user.id) { window.location.href = '/login'; return; }
             document.getElementById('userName').textContent = user.name || 'User';
-
-            try {
-                const res = await apiRequest('GET', '/meetings?page=1&page_size=50');
-                const list = document.getElementById('meetingsList');
-
-                const meetingsList = res.data && res.data.meetings ? res.data.meetings : (Array.isArray(res.data) ? res.data : []);
-                if (meetingsList.length > 0) {
-                    list.innerHTML = meetingsList.map(m => `
-                        <a href="/meetings/${m.id}" class="block p-4 hover:bg-gray-50 transition">
-                            <div class="flex justify-between items-start">
-                                <div>
-                                    <div class="font-semibold text-gray-800 text-lg">${m.title}</div>
-                                    <div class="text-sm text-gray-500 mt-1">
-                                        <i class="fas fa-calendar mr-1"></i>${m.date || '-'}
-                                        <i class="fas fa-map-marker-alt ml-3 mr-1"></i>${m.location || '-'}
-                                    </div>
-                                    <div class="text-sm text-gray-500 mt-1">
-                                        <i class="fas fa-user mr-1"></i>${m.participant_count || 0} peserta
-                                    </div>
-                                </div>
-                                <span class="px-3 py-1 text-xs rounded-full font-medium ${
-                                    m.status === 'completed' ? 'bg-green-100 text-green-700' :
-                                    m.status === 'in_progress' ? 'bg-yellow-100 text-yellow-700' :
-                                    'bg-gray-100 text-gray-600'
-                                }">${m.status || 'draft'}</span>
-                            </div>
-                        </a>
-                    `).join('');
-                } else {
-                    list.innerHTML = `
-                        <div class="p-12 text-center">
-                            <i class="fas fa-folder-open text-5xl text-gray-300 mb-4"></i>
-                            <p class="text-gray-500 text-lg">Belum ada rapat</p>
-                            <a href="/meetings/create" class="inline-block mt-4 bg-indigo-600 text-white px-6 py-2 rounded-lg hover:bg-indigo-700">Buat Rapat Baru</a>
-                        </div>
-                    `;
-                }
-            } catch (err) {
-                document.getElementById('meetingsList').innerHTML = '<div class="p-6 text-center text-red-500">Gagal memuat data rapat</div>';
-            }
+            loadMeetings();
         });
     </script>
 </body>

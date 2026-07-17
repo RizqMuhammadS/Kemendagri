@@ -51,16 +51,66 @@
                     <!-- Meeting Header -->
                     <div class="bg-white rounded-lg shadow p-6 mb-6">
                         <div class="flex justify-between items-start">
-                            <div>
-                                <h1 id="meetingTitle" class="text-2xl font-bold text-gray-800 mb-2"></h1>
-                                <div class="text-gray-500 space-y-1">
-                                    <p id="meetingDate"><i class="fas fa-calendar mr-2"></i></p>
-                                    <p id="meetingLocation"><i class="fas fa-map-marker-alt mr-2"></i></p>
-                                    <p id="meetingOrganizer"><i class="fas fa-user mr-2"></i></p>
-                                    <p id="meetingStatus"></p>
+                            <div class="flex-1">
+                                <!-- View Mode -->
+                                <div id="viewMode">
+                                    <h1 id="meetingTitle" class="text-2xl font-bold text-gray-800 mb-2"></h1>
+                                    <div class="text-gray-500 space-y-1">
+                                        <p id="meetingDate"><i class="fas fa-calendar mr-2"></i></p>
+                                        <p id="meetingLocation"><i class="fas fa-map-marker-alt mr-2"></i></p>
+                                        <p id="meetingOrganizer"><i class="fas fa-user mr-2"></i></p>
+                                        <p id="meetingStatus"><i class="fas fa-info-circle mr-1"></i></p>
+                                    </div>
+                                </div>
+                                <!-- Edit Mode -->
+                                <div id="editMode" class="hidden">
+                                    <div class="space-y-3">
+                                        <div>
+                                            <label class="block text-sm font-semibold text-gray-700 mb-1">Judul Rapat</label>
+                                            <input type="text" id="editTitle" class="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                                        </div>
+                                        <div>
+                                            <label class="block text-sm font-semibold text-gray-700 mb-1">Tanggal</label>
+                                            <input type="date" id="editDate" class="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                                        </div>
+                                        <div>
+                                            <label class="block text-sm font-semibold text-gray-700 mb-1">Lokasi</label>
+                                            <input type="text" id="editLocation" class="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500" placeholder="Masukkan lokasi rapat">
+                                        </div>
+                                        <div>
+                                            <label class="block text-sm font-semibold text-gray-700 mb-1">Penyelenggara ID</label>
+                                            <input type="number" id="editOrganizerId" class="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                                        </div>
+                                        <div>
+                                            <label class="block text-sm font-semibold text-gray-700 mb-1">Status</label>
+                                            <select id="editStatus" class="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                                                <option value="pending">Menunggu</option>
+                                                <option value="processing">Diproses</option>
+                                                <option value="completed">Selesai</option>
+                                                <option value="failed">Gagal</option>
+                                                <option value="transcribed">Tertranskrip</option>
+                                            </select>
+                                        </div>
+                                    </div>
+                                    <div class="flex gap-2 mt-4">
+                                        <button onclick="saveMeeting()" class="bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 text-sm">
+                                            <i class="fas fa-save mr-2"></i>Simpan
+                                        </button>
+                                        <button onclick="cancelEdit()" class="border border-gray-300 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-50 text-sm">
+                                            <i class="fas fa-times mr-2"></i>Batal
+                                        </button>
+                                    </div>
                                 </div>
                             </div>
-                            <span id="statusBadge" class="px-3 py-1 text-sm rounded-full font-medium"></span>
+                            <div class="flex items-center gap-2 ml-4">
+                                <span id="statusBadge" class="px-3 py-1 text-sm rounded-full font-medium"></span>
+                                <button id="editBtn" onclick="toggleEdit()" class="p-2 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition" title="Edit rapat">
+                                    <i class="fas fa-pen"></i>
+                                </button>
+                                <button onclick="deleteCurrentMeeting()" class="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition" title="Hapus rapat">
+                                    <i class="fas fa-trash"></i>
+                                </button>
+                            </div>
                         </div>
                     </div>
 
@@ -197,7 +247,14 @@
             const config = { method, headers };
             if (data) config.body = JSON.stringify(data);
             const res = await fetch(API_BASE + path, config);
-            const json = await res.json();
+            let json;
+            const contentType = res.headers.get('content-type') || '';
+            if (contentType.includes('application/json')) {
+                json = await res.json();
+            } else {
+                const text = await res.text();
+                json = { success: false, error: text || 'Unknown error (status ' + res.status + ')' };
+            }
             if (!json.success && res.status === 401) {
                 localStorage.removeItem('token');
                 localStorage.removeItem('user');
@@ -221,6 +278,9 @@
         let meetingId = null;
         let meetingData = null;
         let selectedFile = null;
+        let isEditing = false;
+        // Store original values for cancel
+        let originalEditValues = {};
 
         document.getElementById('audioFile').addEventListener('change', function(e) {
             selectedFile = e.target.files[0];
@@ -238,6 +298,85 @@
         function closeEmailModal() {
             document.getElementById('emailModal').classList.add('hidden');
             document.getElementById('emailModal').classList.remove('flex');
+        }
+
+        function toggleEdit() {
+            if (isEditing) {
+                // Already editing -> do nothing (save/cancel handles it)
+                return;
+            }
+            isEditing = true;
+            document.getElementById('viewMode').classList.add('hidden');
+            document.getElementById('editMode').classList.remove('hidden');
+            document.getElementById('editBtn').classList.add('hidden');
+
+            // Populate edit fields with current values
+            document.getElementById('editTitle').value = meetingData.title || '';
+            document.getElementById('editDate').value = meetingData.date || '';
+            document.getElementById('editLocation').value = meetingData.location || '';
+            document.getElementById('editOrganizerId').value = meetingData.organizer_id || '';
+            document.getElementById('editStatus').value = meetingData.status || 'pending';
+
+            // Store original values for cancel
+            originalEditValues = {
+                title: meetingData.title || '',
+                date: meetingData.date || '',
+                location: meetingData.location || '',
+                organizer_id: meetingData.organizer_id || '',
+                status: meetingData.status || 'pending'
+            };
+        }
+
+        function cancelEdit() {
+            isEditing = false;
+            document.getElementById('viewMode').classList.remove('hidden');
+            document.getElementById('editMode').classList.add('hidden');
+            document.getElementById('editBtn').classList.remove('hidden');
+        }
+
+        async function saveMeeting() {
+            const updatedData = {
+                title: document.getElementById('editTitle').value.trim(),
+                date: document.getElementById('editDate').value.trim(),
+                location: document.getElementById('editLocation').value.trim(),
+                status: document.getElementById('editStatus').value
+            };
+
+            // Validate required fields
+            if (!updatedData.title) {
+                showAlert('Judul rapat tidak boleh kosong', 'error');
+                return;
+            }
+            if (!updatedData.date) {
+                showAlert('Tanggal rapat tidak boleh kosong', 'error');
+                return;
+            }
+
+            // Note: organizer_id is not updated via this endpoint since it's a system field
+            // But we include it in the UI for display; actual save only updates title, date, location, status
+
+            const btn = document.querySelector('#editMode button.bg-indigo-600');
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Menyimpan...';
+
+            try {
+                const res = await apiRequest('PUT', '/meetings/' + meetingId, updatedData);
+                if (res.success) {
+                    showAlert('✅ Data rapat berhasil diperbarui', 'success');
+                    // Reload data to get fresh values
+                    await loadMeeting();
+                    isEditing = false;
+                    document.getElementById('viewMode').classList.remove('hidden');
+                    document.getElementById('editMode').classList.add('hidden');
+                    document.getElementById('editBtn').classList.remove('hidden');
+                } else {
+                    showAlert(res.error || '❌ Gagal memperbarui rapat', 'error');
+                }
+            } catch (err) {
+                showAlert('❌ Gagal memperbarui rapat: ' + err.message, 'error');
+            }
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fas fa-save mr-2"></i>Simpan';
         }
 
         async function uploadAudio() {
@@ -387,6 +526,24 @@
             }
         }
 
+        async function deleteCurrentMeeting() {
+            if (!meetingData) return;
+            if (!confirm(`Apakah Anda yakin ingin menghapus rapat "${meetingData.title}"? Data yang sudah dihapus tidak dapat dikembalikan.`)) return;
+
+            try {
+                const res = await apiRequest('DELETE', '/meetings/' + meetingId);
+                if (res.success) {
+                    showAlert('✅ Rapat "' + meetingData.title + '" berhasil dihapus', 'success');
+                    // Redirect back to meetings list
+                    setTimeout(() => { window.location.href = '/meetings'; }, 1000);
+                } else {
+                    showAlert(res.error || '❌ Gagal menghapus rapat', 'error');
+                }
+            } catch (err) {
+                showAlert('❌ Gagal menghapus rapat: ' + err.message, 'error');
+            }
+        }
+
         async function loadMeeting() {
             try {
                 const res = await apiRequest('GET', '/meetings/' + meetingId);
@@ -415,7 +572,7 @@
 
             const statusEl = document.getElementById('meetingStatus');
             const status = d.status || 'pending';
-            const statusMap = { 'completed': 'Selesai', 'processing': 'Diproses', 'pending': 'Menunggu', 'failed': 'Gagal' };
+            const statusMap = { 'completed': 'Selesai', 'processing': 'Diproses', 'pending': 'Menunggu', 'failed': 'Gagal', 'transcribed': 'Tertranskrip' };
             statusEl.innerHTML = '<i class="fas fa-info-circle mr-1"></i>Status: ' + (statusMap[status] || status);
 
             const statusBadge = document.getElementById('statusBadge');
@@ -423,7 +580,8 @@
                 'completed': 'bg-green-100 text-green-700',
                 'processing': 'bg-yellow-100 text-yellow-700',
                 'pending': 'bg-gray-100 text-gray-600',
-                'failed': 'bg-red-100 text-red-700'
+                'failed': 'bg-red-100 text-red-700',
+                'transcribed': 'bg-blue-100 text-blue-700'
             };
             statusBadge.className = 'px-3 py-1 text-sm rounded-full font-medium ' + (colors[status] || 'bg-gray-100 text-gray-600');
             statusBadge.textContent = statusMap[status] || status;

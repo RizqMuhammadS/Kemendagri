@@ -313,6 +313,53 @@ func (s *MeetingService) SendMeetingEmail(meetingID uint, recipients []string, f
 	return s.emailSvc.SendMinutes(detail.Title, recipients, attachmentPath)
 }
 
+// UpdateMeeting updates a meeting's basic info (title, date, location, status)
+func (s *MeetingService) UpdateMeeting(meetingID uint, req *dto.UpdateMeetingRequest) (*models.Meeting, error) {
+	meeting, err := s.meetingRepo.FindByID(meetingID)
+	if err != nil {
+		return nil, fmt.Errorf("meeting not found: %w", err)
+	}
+
+	if req.Title != "" {
+		meeting.Title = req.Title
+	}
+	if req.Date != "" {
+		parsedDate, err := time.Parse("2006-01-02", req.Date)
+		if err != nil {
+			return nil, fmt.Errorf("invalid date format, use YYYY-MM-DD: %w", err)
+		}
+		meeting.Date = parsedDate
+	}
+	if req.Location != "" {
+		meeting.Location = req.Location
+	}
+	if req.Status != "" {
+		// Validate status
+		validStatuses := map[string]bool{"pending": true, "processing": true, "completed": true, "failed": true, "transcribed": true}
+		if !validStatuses[req.Status] {
+			return nil, fmt.Errorf("invalid status: %s (valid: pending, processing, completed, failed, transcribed)", req.Status)
+		}
+		meeting.Status = req.Status
+	}
+
+	if err := s.meetingRepo.Update(meeting); err != nil {
+		return nil, fmt.Errorf("failed to update meeting: %w", err)
+	}
+
+	return meeting, nil
+}
+
+// DeleteMeeting deletes a meeting by ID
+func (s *MeetingService) DeleteMeeting(meetingID uint) error {
+	// Check if meeting exists
+	_, err := s.meetingRepo.FindByID(meetingID)
+	if err != nil {
+		return fmt.Errorf("meeting not found: %w", err)
+	}
+
+	return s.meetingRepo.Delete(meetingID)
+}
+
 // GetDashboardStats returns dashboard statistics
 func (s *MeetingService) GetDashboardStats() (*dto.DashboardResponse, error) {
 	// Get counts

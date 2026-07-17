@@ -4,7 +4,7 @@ from faster_whisper import WhisperModel
 audio = sys.argv[1]
 
 model = WhisperModel(
-    "bash",
+    "medium",
     device="cpu",
     compute_type="int8"
 )

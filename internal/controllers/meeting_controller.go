@@ -280,6 +280,83 @@ func (c *MeetingController) SendEmail(ctx *gin.Context) {
 	})
 }
 
+// UpdateMeeting handles updating a meeting's basic info
+// @Summary Update meeting info (title, date, location, status)
+// @Tags Meetings
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param id path int true "Meeting ID"
+// @Param request body dto.UpdateMeetingRequest true "Meeting update data"
+// @Success 200 {object} dto.APIResponse
+// @Router /api/meetings/{id} [put]
+func (c *MeetingController) UpdateMeeting(ctx *gin.Context) {
+	id, err := strconv.ParseUint(ctx.Param("id"), 10, 32)
+	if err != nil {
+		ctx.JSON(http.StatusBadRequest, dto.APIResponse{
+			Success: false,
+			Error:   "Invalid meeting ID",
+		})
+		return
+	}
+
+	var req dto.UpdateMeetingRequest
+	if err := ctx.ShouldBindJSON(&req); err != nil {
+		ctx.JSON(http.StatusBadRequest, dto.APIResponse{
+			Success: false,
+			Error:   err.Error(),
+		})
+		return
+	}
+
+	meeting, err := c.meetingService.UpdateMeeting(uint(id), &req)
+	if err != nil {
+		ctx.JSON(http.StatusInternalServerError, dto.APIResponse{
+			Success: false,
+			Error:   err.Error(),
+		})
+		return
+	}
+
+	ctx.JSON(http.StatusOK, dto.APIResponse{
+		Success: true,
+		Message: "Rapat berhasil diperbarui",
+		Data:    meeting,
+	})
+}
+
+// DeleteMeeting handles deleting a meeting
+// @Summary Delete a meeting
+// @Tags Meetings
+// @Produce json
+// @Security BearerAuth
+// @Param id path int true "Meeting ID"
+// @Success 200 {object} dto.APIResponse
+// @Router /api/meetings/{id} [delete]
+func (c *MeetingController) DeleteMeeting(ctx *gin.Context) {
+	id, err := strconv.ParseUint(ctx.Param("id"), 10, 32)
+	if err != nil {
+		ctx.JSON(http.StatusBadRequest, dto.APIResponse{
+			Success: false,
+			Error:   "Invalid meeting ID",
+		})
+		return
+	}
+
+	if err := c.meetingService.DeleteMeeting(uint(id)); err != nil {
+		ctx.JSON(http.StatusInternalServerError, dto.APIResponse{
+			Success: false,
+			Error:   err.Error(),
+		})
+		return
+	}
+
+	ctx.JSON(http.StatusOK, dto.APIResponse{
+		Success: true,
+		Message: "Rapat berhasil dihapus",
+	})
+}
+
 // GetDashboard handles dashboard statistics
 // @Summary Get dashboard statistics
 // @Tags Dashboard

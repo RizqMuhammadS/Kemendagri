@@ -8,6 +8,8 @@ import (
 	"mime/multipart"
 	"net/http"
 	"os"
+	"os/exec"
+	"strings"
 
 	"github.com/yourusername/meeting-minutes-ai/internal/config"
 )
@@ -27,18 +29,41 @@ func NewSTTService(cfg *config.Config) *STTService {
 	return &STTService{cfg: cfg}
 }
 
+func (s *STTService) transcribeLocal(audioPath string) (string, error) {
+
+    cmd := exec.Command(
+        "python",
+        "whisper.py",
+        audioPath,
+    )
+
+    output, err := cmd.CombinedOutput()
+    if err != nil {
+        return "", fmt.Errorf("whisper error: %v\n%s", err, string(output))
+    }
+
+    transcript := strings.TrimSpace(string(output))
+
+    return transcript, nil
+}
+
 // Transcribe converts audio file to text using the configured STT engine
 func (s *STTService) Transcribe(audioPath string) (string, error) {
-	switch s.cfg.STTEngine {
-	case "whisper":
-		return s.transcribeWhisper(audioPath)
-	case "google":
-		return s.transcribeGoogle(audioPath)
-	case "azure":
-		return s.transcribeAzure(audioPath)
-	default:
-		return "", fmt.Errorf("unsupported STT engine: %s", s.cfg.STTEngine)
-	}
+
+    switch s.cfg.STTEngine {
+
+    case "whisper":
+        return s.transcribeLocal(audioPath)
+
+    case "google":
+        return s.transcribeGoogle(audioPath)
+
+    case "azure":
+        return s.transcribeAzure(audioPath)
+
+    default:
+        return "", fmt.Errorf("unsupported STT engine")
+    }
 }
 
 func (s *STTService) transcribeWhisper(audioPath string) (string, error) {

@@ -10,6 +10,14 @@ type CreateMeetingRequest struct {
 	Participants []ParticipantRequest `json:"participants"`
 }
 
+// UpdateMeetingRequest represents request to update a meeting's basic info
+type UpdateMeetingRequest struct {
+	Title    string `json:"title"`
+	Date     string `json:"date"`
+	Location string `json:"location"`
+	Status   string `json:"status"`
+}
+
 // ParticipantRequest represents a participant in the request
 type ParticipantRequest struct {
 	Name  string `json:"name" validate:"required"`
