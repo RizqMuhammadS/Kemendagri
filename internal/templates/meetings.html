@@ -13,6 +13,18 @@
         .meeting-card:hover .delete-btn { opacity: 1; }
         .delete-btn { opacity: 0; transition: opacity 0.2s; }
         .status-badge { font-size: 0.75rem; }
+        .filter-panel { transition: all 0.3s ease; }
+        .filter-btn.active { background-color: #4f46e5; color: white; border-color: #4f46e5; }
+        .date-input { font-size: 0.875rem; }
+        .filter-section { transition: max-height 0.3s ease, opacity 0.3s ease; }
+        .badge-filter-count {
+            background-color: #4f46e5;
+            color: white;
+            border-radius: 9999px;
+            padding: 0.125rem 0.5rem;
+            font-size: 0.75rem;
+            font-weight: 600;
+        }
     </style>
 </head>
 <body class="bg-gray-100">
@@ -55,11 +67,12 @@
                     <p class="text-gray-500">Memuat daftar rapat...</p>
                 </div>
 
-                <!-- Search Form -->
-                <div class="mb-6">
-                    <div class="flex gap-2">
+                <!-- Search + Filter Section -->
+                <div class="mb-6 bg-white rounded-lg shadow p-4">
+                    <!-- Search Bar -->
+                    <div class="flex gap-2 mb-4">
                         <div class="relative flex-1">
-                            <input type="text" id="searchInput" placeholder="Cari rapat berdasarkan judul, lokasi, atau konten..." 
+                            <input type="text" id="searchInput" placeholder="Cari rapat berdasarkan judul, lokasi..." 
                                 class="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
                                 oninput="onSearchInput()"
                                 onkeydown="if(event.key === 'Enter') { clearTimeout(searchTimeout); searchMeetings(); }">
@@ -71,7 +84,87 @@
                         <button id="clearSearchBtn" onclick="clearSearch()" class="hidden bg-gray-200 text-gray-600 px-4 py-2 rounded-lg hover:bg-gray-300 text-sm flex items-center gap-1">
                             <i class="fas fa-times"></i> Hapus
                         </button>
+                        <!-- Toggle Filter Button -->
+                        <button onclick="toggleFilter()" class="border border-gray-300 text-gray-600 px-3 py-2 rounded-lg hover:bg-gray-50 text-sm flex items-center gap-1" title="Filter">
+                            <i class="fas fa-filter"></i>
+                            <span id="filterBadge" class="hidden badge-filter-count">0</span>
+                        </button>
                     </div>
+
+                    <!-- Filter Panel (collapsible) -->
+                    <div id="filterPanel" class="hidden filter-panel">
+                        <div class="border-t pt-4">
+                            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                <!-- Filter Status -->
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">
+                                        <i class="fas fa-flag mr-1 text-indigo-500"></i>Status
+                                    </label>
+                                    <select id="filterStatus" onchange="applyFilters()" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
+                                        <option value="">Semua Status</option>
+                                        <option value="completed">Selesai</option>
+                                        <option value="processing">Diproses</option>
+                                        <option value="pending">Menunggu</option>
+                                        <option value="failed">Gagal</option>
+                                        <option value="transcribed">Tertranskrip</option>
+                                    </select>
+                                </div>
+
+                                <!-- Filter Tanggal -->
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">
+                                        <i class="fas fa-calendar mr-1 text-indigo-500"></i>Tanggal
+                                    </label>
+                                    <select id="filterDatePreset" onchange="onDatePresetChange()" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
+                                        <option value="">Semua Tanggal</option>
+                                        <option value="today">Hari Ini</option>
+                                        <option value="yesterday">Kemarin</option>
+                                        <option value="7days">7 Hari Terakhir</option>
+                                        <option value="30days">30 Hari Terakhir</option>
+                                        <option value="thisMonth">Bulan Ini</option>
+                                        <option value="custom">Kustom</option>
+                                    </select>
+                                    <div id="customDateRange" class="hidden mt-2 flex gap-2">
+                                        <div>
+                                            <input type="date" id="filterDateFrom" onchange="applyFilters()" class="date-input w-full border border-gray-300 rounded-lg px-2 py-1.5 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500" placeholder="Dari">
+                                        </div>
+                                        <div>
+                                            <input type="date" id="filterDateTo" onchange="applyFilters()" class="date-input w-full border border-gray-300 rounded-lg px-2 py-1.5 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500" placeholder="Sampai">
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Filter Lokasi -->
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">
+                                        <i class="fas fa-map-marker-alt mr-1 text-indigo-500"></i>Lokasi
+                                    </label>
+                                    <select id="filterLocation" onchange="applyFilters()" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
+                                        <option value="">Semua Lokasi</option>
+                                    </select>
+                                </div>
+                            </div>
+
+                            <!-- Filter Actions -->
+                            <div class="flex justify-between items-center mt-4 pt-3 border-t">
+                                <div id="filterInfo" class="text-sm text-gray-500">
+                                    <i class="fas fa-info-circle mr-1"></i>
+                                    <span id="filterResultCount">Menampilkan semua rapat</span>
+                                </div>
+                                <div class="flex gap-2">
+                                    <button onclick="resetFilters()" class="text-sm text-gray-600 px-3 py-1.5 rounded-lg border border-gray-300 hover:bg-gray-50 flex items-center gap-1">
+                                        <i class="fas fa-undo"></i> Reset
+                                    </button>
+                                    <button onclick="toggleFilter()" class="text-sm text-gray-600 px-3 py-1.5 rounded-lg border border-gray-300 hover:bg-gray-50 flex items-center gap-1">
+                                        <i class="fas fa-times"></i> Tutup
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Active Filter Tags -->
+                    <div id="activeFilters" class="hidden flex flex-wrap gap-2 mt-3"></div>
                 </div>
 
                 <div id="meetingList" class="hidden space-y-4"></div>
@@ -134,13 +227,193 @@
         let totalMeetings = 0;
         let currentSearch = '';
         const pageSize = 10;
-        let allMeetingsData = [];
         let searchTimeout = null;
+
+        // Filter state
+        let activeFilters = {
+            status: '',
+            datePreset: '',
+            dateFrom: '',
+            dateTo: '',
+            location: ''
+        };
+
+        function toggleFilter() {
+            const panel = document.getElementById('filterPanel');
+            panel.classList.toggle('hidden');
+        }
+
+        function onDatePresetChange() {
+            const preset = document.getElementById('filterDatePreset').value;
+            const customRange = document.getElementById('customDateRange');
+            if (preset === 'custom') {
+                customRange.classList.remove('hidden');
+            } else {
+                customRange.classList.add('hidden');
+                // Clear custom date values when not custom
+                document.getElementById('filterDateFrom').value = '';
+                document.getElementById('filterDateTo').value = '';
+            }
+            applyFilters();
+        }
+
+        function applyFilters() {
+            activeFilters.status = document.getElementById('filterStatus').value;
+            activeFilters.datePreset = document.getElementById('filterDatePreset').value;
+            activeFilters.dateFrom = document.getElementById('filterDateFrom').value;
+            activeFilters.dateTo = document.getElementById('filterDateTo').value;
+            activeFilters.location = document.getElementById('filterLocation').value;
+
+            updateFilterUI();
+            filterMeetings();
+        }
+
+        function resetFilters() {
+            document.getElementById('filterStatus').value = '';
+            document.getElementById('filterDatePreset').value = '';
+            document.getElementById('filterDateFrom').value = '';
+            document.getElementById('filterDateTo').value = '';
+            document.getElementById('filterLocation').value = '';
+            document.getElementById('customDateRange').classList.add('hidden');
+
+            activeFilters = { status: '', datePreset: '', dateFrom: '', dateTo: '', location: '' };
+            updateFilterUI();
+            filterMeetings();
+        }
+
+        function getActiveFilterCount() {
+            let count = 0;
+            if (activeFilters.status) count++;
+            if (activeFilters.datePreset) count++;
+            if (activeFilters.dateFrom || activeFilters.dateTo) {
+                // Only count if it's custom range (since preset already counted)
+                if (activeFilters.datePreset === 'custom') count++;
+            }
+            if (activeFilters.datePreset === '') {
+                // Check if custom range is filled without preset being custom
+                if (activeFilters.dateFrom || activeFilters.dateTo) count++;
+            }
+            if (activeFilters.location) count++;
+            return count;
+        }
+
+        function updateFilterUI() {
+            const count = getActiveFilterCount();
+            const badge = document.getElementById('filterBadge');
+            if (count > 0) {
+                badge.textContent = count;
+                badge.classList.remove('hidden');
+            } else {
+                badge.classList.add('hidden');
+            }
+
+            // Update active filter tags
+            const tagsContainer = document.getElementById('activeFilters');
+            tagsContainer.innerHTML = '';
+            let hasTags = false;
+
+            const statusMap = { 'completed': 'Selesai', 'processing': 'Diproses', 'pending': 'Menunggu', 'failed': 'Gagal', 'transcribed': 'Tertranskrip' };
+            const datePresetMap = { 'today': 'Hari Ini', 'yesterday': 'Kemarin', '7days': '7 Hari Terakhir', '30days': '30 Hari Terakhir', 'thisMonth': 'Bulan Ini', 'custom': 'Kustom' };
+
+            function addTag(label, value, onRemove) {
+                hasTags = true;
+                const tag = document.createElement('span');
+                tag.className = 'inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-indigo-100 text-indigo-700';
+                tag.innerHTML = `${label}: <strong>${value}</strong> <button onclick="${onRemove}" class="ml-1 hover:text-indigo-900"><i class="fas fa-times"></i></button>`;
+                tagsContainer.appendChild(tag);
+            }
+
+            if (activeFilters.status) {
+                addTag('Status', statusMap[activeFilters.status] || activeFilters.status, "document.getElementById('filterStatus').value=''; applyFilters()");
+            }
+
+            if (activeFilters.datePreset && activeFilters.datePreset !== 'custom') {
+                addTag('Tanggal', datePresetMap[activeFilters.datePreset] || activeFilters.datePreset, "document.getElementById('filterDatePreset').value=''; applyFilters()");
+            } else if (activeFilters.datePreset === 'custom' || activeFilters.dateFrom || activeFilters.dateTo) {
+                let dateLabel = '';
+                if (activeFilters.dateFrom && activeFilters.dateTo) {
+                    dateLabel = activeFilters.dateFrom + ' s/d ' + activeFilters.dateTo;
+                } else if (activeFilters.dateFrom) {
+                    dateLabel = 'Dari ' + activeFilters.dateFrom;
+                } else if (activeFilters.dateTo) {
+                    dateLabel = 'Sampai ' + activeFilters.dateTo;
+                }
+                if (dateLabel) {
+                    addTag('Tanggal', dateLabel, "document.getElementById('filterDatePreset').value=''; document.getElementById('filterDateFrom').value=''; document.getElementById('filterDateTo').value=''; document.getElementById('customDateRange').classList.add('hidden'); applyFilters()");
+                }
+            }
+
+            if (activeFilters.location) {
+                addTag('Lokasi', activeFilters.location, "document.getElementById('filterLocation').value=''; applyFilters()");
+            }
+
+            if (hasTags) {
+                tagsContainer.classList.remove('hidden');
+            } else {
+                tagsContainer.classList.add('hidden');
+            }
+        }
+
+        // Date filter checking helper
+        function isDateInRange(dateStr, preset, dateFrom, dateTo) {
+            if (!preset && !dateFrom && !dateTo) return true;
+
+            const meetingDate = new Date(dateStr);
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+
+            // Normalize meeting date to start of day
+            meetingDate.setHours(0, 0, 0, 0);
+
+            switch (preset) {
+                case 'today':
+                    return meetingDate.getTime() === today.getTime();
+                case 'yesterday': {
+                    const yesterday = new Date(today);
+                    yesterday.setDate(yesterday.getDate() - 1);
+                    return meetingDate.getTime() === yesterday.getTime();
+                }
+                case '7days': {
+                    const sevenDaysAgo = new Date(today);
+                    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 6);
+                    return meetingDate >= sevenDaysAgo && meetingDate <= today;
+                }
+                case '30days': {
+                    const thirtyDaysAgo = new Date(today);
+                    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 29);
+                    return meetingDate >= thirtyDaysAgo && meetingDate <= today;
+                }
+                case 'thisMonth': {
+                    const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+                    const endOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+                    return meetingDate >= startOfMonth && meetingDate <= endOfMonth;
+                }
+                default:
+                    break;
+            }
+
+            // Custom range check
+            if (dateFrom && dateTo) {
+                const from = new Date(dateFrom);
+                const to = new Date(dateTo);
+                to.setHours(23, 59, 59, 999);
+                return meetingDate >= from && meetingDate <= to;
+            } else if (dateFrom) {
+                const from = new Date(dateFrom);
+                return meetingDate >= from;
+            } else if (dateTo) {
+                const to = new Date(dateTo);
+                to.setHours(23, 59, 59, 999);
+                return meetingDate <= to;
+            }
+
+            return true;
+        }
 
         function onSearchInput() {
             clearTimeout(searchTimeout);
             searchTimeout = setTimeout(() => {
-                filterMeetings();
+                applyFilters();
             }, 200);
         }
 
@@ -161,7 +434,23 @@
             cards.forEach(card => {
                 const title = (card.getAttribute('data-title') || '').toLowerCase();
                 const location = (card.getAttribute('data-location') || '').toLowerCase();
-                if (title.includes(searchVal) || location.includes(searchVal)) {
+                const status = card.getAttribute('data-status') || '';
+                const date = card.getAttribute('data-date') || '';
+
+                // Text search filter
+                const matchesSearch = !searchVal || title.includes(searchVal) || location.includes(searchVal);
+
+                // Status filter
+                const matchesStatus = !activeFilters.status || status === activeFilters.status;
+
+                // Date filter
+                const matchesDate = isDateInRange(date, activeFilters.datePreset, activeFilters.dateFrom, activeFilters.dateTo);
+
+                // Location filter
+                const cardLocation = (card.getAttribute('data-location') || '').trim();
+                const matchesLocation = !activeFilters.location || cardLocation.toLowerCase() === activeFilters.location.toLowerCase();
+
+                if (matchesSearch && matchesStatus && matchesDate && matchesLocation) {
                     card.style.display = 'flex';
                     visibleCount++;
                 } else {
@@ -169,14 +458,26 @@
                 }
             });
 
+            // Update filter result count info
+            const filterInfo = document.getElementById('filterResultCount');
+            if (visibleCount === 0) {
+                filterInfo.textContent = 'Tidak ada rapat yang cocok dengan filter';
+            } else {
+                filterInfo.textContent = `Menampilkan ${visibleCount} rapat`;
+            }
+
             // Show/hide empty state
             const emptyState = document.getElementById('emptyState');
+            const hasFilters = getActiveFilterCount() > 0 || searchVal;
+
             if (visibleCount === 0) {
-                if (searchVal) {
+                if (hasFilters) {
                     document.getElementById('emptyIcon').className = 'fas fa-search text-5xl text-gray-300 mb-4';
                     document.getElementById('emptyTitle').textContent = 'Rapat tidak ditemukan';
-                    document.getElementById('emptyDesc').textContent = 'Tidak ada rapat yang cocok dengan "' + searchVal + '". Coba kata kunci lain.';
-                    document.getElementById('emptyAction').innerHTML = '<button onclick="clearSearch()" class="text-indigo-600 hover:underline mt-2 inline-block"><i class="fas fa-times mr-1"></i>Hapus pencarian</button>';
+                    let desc = 'Tidak ada rapat yang cocok dengan kriteria';
+                    if (searchVal) desc += ' "' + searchVal + '"';
+                    document.getElementById('emptyDesc').textContent = desc + '. Coba ubah kata kunci atau filter.';
+                    document.getElementById('emptyAction').innerHTML = '<button onclick="clearSearch(); resetFilters();" class="text-indigo-600 hover:underline mt-2 inline-block"><i class="fas fa-times mr-1"></i>Hapus semua filter</button>';
                 } else {
                     document.getElementById('emptyIcon').className = 'fas fa-folder-open text-5xl text-gray-300 mb-4';
                     document.getElementById('emptyTitle').textContent = 'Belum ada rapat';
@@ -187,7 +488,7 @@
                 document.getElementById('pagination').classList.add('hidden');
             } else {
                 emptyState.classList.add('hidden');
-                if (!searchVal) {
+                if (!hasFilters) {
                     renderPagination();
                 } else {
                     document.getElementById('pagination').classList.add('hidden');
@@ -196,8 +497,7 @@
         }
 
         function searchMeetings() {
-            // Same as onSearchInput but instant
-            filterMeetings();
+            applyFilters();
         }
 
         function clearSearch() {
@@ -240,12 +540,34 @@
                         }
                         emptyState.classList.remove('hidden');
                     } else {
+                        // Collect unique locations for the location filter
+                        const locations = new Set();
+                        meetings.forEach(m => {
+                            if (m.location) locations.add(m.location);
+                        });
+
+                        // Update location dropdown
+                        const locationSelect = document.getElementById('filterLocation');
+                        const currentVal = locationSelect.value;
+                        locationSelect.innerHTML = '<option value="">Semua Lokasi</option>';
+                        [...locations].sort().forEach(loc => {
+                            const opt = document.createElement('option');
+                            opt.value = loc;
+                            opt.textContent = loc;
+                            locationSelect.appendChild(opt);
+                        });
+                        if (currentVal && locations.has(currentVal)) {
+                            locationSelect.value = currentVal;
+                        }
+
                         meetings.forEach(m => {
                             const card = document.createElement('div');
                             card.className = 'meeting-card bg-white rounded-lg shadow p-4 hover:shadow-md transition flex justify-between items-start';
                             card.id = 'meeting-' + m.id;
                             card.setAttribute('data-title', m.title || '');
                             card.setAttribute('data-location', m.location || '');
+                            card.setAttribute('data-status', m.status || 'pending');
+                            card.setAttribute('data-date', m.date || '');
                             const statusMap = { 'completed': 'Selesai', 'processing': 'Diproses', 'pending': 'Menunggu', 'failed': 'Gagal', 'transcribed': 'Tertranskrip' };
                             const statusColors = { 'completed': 'bg-green-100 text-green-700', 'processing': 'bg-yellow-100 text-yellow-700', 'pending': 'bg-gray-100 text-gray-600', 'failed': 'bg-red-100 text-red-700', 'transcribed': 'bg-blue-100 text-blue-700' };
                             const status = m.status || 'pending';
@@ -268,8 +590,9 @@
                         });
                         container.classList.remove('hidden');
 
-                        // Apply any active search filter
-                        if (currentSearch) {
+                        // Apply any active filters
+                        const hasFilters = getActiveFilterCount() > 0 || currentSearch;
+                        if (hasFilters) {
                             filterMeetings();
                         } else {
                             renderPagination();
@@ -327,9 +650,7 @@
                 const res = await apiRequest('DELETE', '/meetings/' + id);
                 if (res.success) {
                     showAlert('✅ Rapat "' + title + '" berhasil dihapus', 'success');
-                    // Remove card from DOM
                     if (card) card.remove();
-                    // Check if list is empty
                     const container = document.getElementById('meetingList');
                     if (container.children.length === 0) {
                         container.classList.add('hidden');
