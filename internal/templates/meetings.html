@@ -55,12 +55,32 @@
                     <p class="text-gray-500">Memuat daftar rapat...</p>
                 </div>
 
+                <!-- Search Form -->
+                <div class="mb-6">
+                    <div class="flex gap-2">
+                        <div class="relative flex-1">
+                            <input type="text" id="searchInput" placeholder="Cari rapat berdasarkan judul, lokasi, atau konten..." 
+                                class="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                                oninput="onSearchInput()"
+                                onkeydown="if(event.key === 'Enter') { clearTimeout(searchTimeout); searchMeetings(); }">
+                            <i class="fas fa-search absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"></i>
+                        </div>
+                        <button onclick="searchMeetings()" class="bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 text-sm flex items-center gap-1">
+                            <i class="fas fa-search"></i> Cari
+                        </button>
+                        <button id="clearSearchBtn" onclick="clearSearch()" class="hidden bg-gray-200 text-gray-600 px-4 py-2 rounded-lg hover:bg-gray-300 text-sm flex items-center gap-1">
+                            <i class="fas fa-times"></i> Hapus
+                        </button>
+                    </div>
+                </div>
+
                 <div id="meetingList" class="hidden space-y-4"></div>
 
                 <div id="emptyState" class="hidden text-center py-12 bg-white rounded-lg shadow">
-                    <i class="fas fa-folder-open text-5xl text-gray-300 mb-4"></i>
-                    <p class="text-gray-500 text-lg">Belum ada rapat</p>
-                    <a href="/meetings/create" class="text-indigo-600 hover:underline mt-2 inline-block">Buat rapat baru</a>
+                    <i id="emptyIcon" class="fas fa-folder-open text-5xl text-gray-300 mb-4"></i>
+                    <p id="emptyTitle" class="text-gray-500 text-lg">Belum ada rapat</p>
+                    <p id="emptyDesc" class="text-gray-400 text-sm mt-1">Buat rapat baru untuk memulai</p>
+                    <a id="emptyAction" href="/meetings/create" class="text-indigo-600 hover:underline mt-2 inline-block">Buat rapat baru</a>
                 </div>
 
                 <!-- Pagination -->
@@ -112,7 +132,80 @@
 
         let currentPage = 1;
         let totalMeetings = 0;
+        let currentSearch = '';
         const pageSize = 10;
+        let allMeetingsData = [];
+        let searchTimeout = null;
+
+        function onSearchInput() {
+            clearTimeout(searchTimeout);
+            searchTimeout = setTimeout(() => {
+                filterMeetings();
+            }, 200);
+        }
+
+        function filterMeetings() {
+            const searchVal = document.getElementById('searchInput').value.trim().toLowerCase();
+            currentSearch = searchVal;
+
+            if (searchVal !== '') {
+                document.getElementById('clearSearchBtn').classList.remove('hidden');
+            } else {
+                document.getElementById('clearSearchBtn').classList.add('hidden');
+            }
+
+            const container = document.getElementById('meetingList');
+            const cards = container.querySelectorAll('.meeting-card');
+            let visibleCount = 0;
+
+            cards.forEach(card => {
+                const title = (card.getAttribute('data-title') || '').toLowerCase();
+                const location = (card.getAttribute('data-location') || '').toLowerCase();
+                if (title.includes(searchVal) || location.includes(searchVal)) {
+                    card.style.display = 'flex';
+                    visibleCount++;
+                } else {
+                    card.style.display = 'none';
+                }
+            });
+
+            // Show/hide empty state
+            const emptyState = document.getElementById('emptyState');
+            if (visibleCount === 0) {
+                if (searchVal) {
+                    document.getElementById('emptyIcon').className = 'fas fa-search text-5xl text-gray-300 mb-4';
+                    document.getElementById('emptyTitle').textContent = 'Rapat tidak ditemukan';
+                    document.getElementById('emptyDesc').textContent = 'Tidak ada rapat yang cocok dengan "' + searchVal + '". Coba kata kunci lain.';
+                    document.getElementById('emptyAction').innerHTML = '<button onclick="clearSearch()" class="text-indigo-600 hover:underline mt-2 inline-block"><i class="fas fa-times mr-1"></i>Hapus pencarian</button>';
+                } else {
+                    document.getElementById('emptyIcon').className = 'fas fa-folder-open text-5xl text-gray-300 mb-4';
+                    document.getElementById('emptyTitle').textContent = 'Belum ada rapat';
+                    document.getElementById('emptyDesc').textContent = 'Buat rapat baru untuk memulai';
+                    document.getElementById('emptyAction').innerHTML = '<a href="/meetings/create" class="text-indigo-600 hover:underline mt-2 inline-block">Buat rapat baru</a>';
+                }
+                emptyState.classList.remove('hidden');
+                document.getElementById('pagination').classList.add('hidden');
+            } else {
+                emptyState.classList.add('hidden');
+                if (!searchVal) {
+                    renderPagination();
+                } else {
+                    document.getElementById('pagination').classList.add('hidden');
+                }
+            }
+        }
+
+        function searchMeetings() {
+            // Same as onSearchInput but instant
+            filterMeetings();
+        }
+
+        function clearSearch() {
+            document.getElementById('searchInput').value = '';
+            currentSearch = '';
+            document.getElementById('clearSearchBtn').classList.add('hidden');
+            filterMeetings();
+        }
 
         async function loadMeetings(page = 1) {
             document.getElementById('loading').classList.remove('hidden');
@@ -121,7 +214,11 @@
             document.getElementById('pagination').classList.add('hidden');
 
             try {
-                const res = await apiRequest('GET', '/meetings?page=' + page + '&page_size=' + pageSize);
+                let url = '/meetings?page=' + page + '&page_size=' + pageSize;
+                if (currentSearch) {
+                    url += '&search=' + encodeURIComponent(currentSearch);
+                }
+                const res = await apiRequest('GET', url);
                 if (res.success) {
                     const meetings = res.data.meetings || [];
                     totalMeetings = res.data.total || 0;
@@ -129,12 +226,26 @@
                     container.innerHTML = '';
 
                     if (meetings.length === 0) {
-                        document.getElementById('emptyState').classList.remove('hidden');
+                        const emptyState = document.getElementById('emptyState');
+                        if (currentSearch) {
+                            document.getElementById('emptyIcon').className = 'fas fa-search text-5xl text-gray-300 mb-4';
+                            document.getElementById('emptyTitle').textContent = 'Rapat tidak ditemukan';
+                            document.getElementById('emptyDesc').textContent = 'Tidak ada rapat yang cocok dengan "' + currentSearch + '". Coba kata kunci lain.';
+                            document.getElementById('emptyAction').innerHTML = '<button onclick="clearSearch()" class="text-indigo-600 hover:underline mt-2 inline-block"><i class="fas fa-times mr-1"></i>Hapus pencarian</button>';
+                        } else {
+                            document.getElementById('emptyIcon').className = 'fas fa-folder-open text-5xl text-gray-300 mb-4';
+                            document.getElementById('emptyTitle').textContent = 'Belum ada rapat';
+                            document.getElementById('emptyDesc').textContent = 'Buat rapat baru untuk memulai';
+                            document.getElementById('emptyAction').innerHTML = '<a href="/meetings/create" class="text-indigo-600 hover:underline mt-2 inline-block">Buat rapat baru</a>';
+                        }
+                        emptyState.classList.remove('hidden');
                     } else {
                         meetings.forEach(m => {
                             const card = document.createElement('div');
                             card.className = 'meeting-card bg-white rounded-lg shadow p-4 hover:shadow-md transition flex justify-between items-start';
                             card.id = 'meeting-' + m.id;
+                            card.setAttribute('data-title', m.title || '');
+                            card.setAttribute('data-location', m.location || '');
                             const statusMap = { 'completed': 'Selesai', 'processing': 'Diproses', 'pending': 'Menunggu', 'failed': 'Gagal', 'transcribed': 'Tertranskrip' };
                             const statusColors = { 'completed': 'bg-green-100 text-green-700', 'processing': 'bg-yellow-100 text-yellow-700', 'pending': 'bg-gray-100 text-gray-600', 'failed': 'bg-red-100 text-red-700', 'transcribed': 'bg-blue-100 text-blue-700' };
                             const status = m.status || 'pending';
@@ -156,7 +267,13 @@
                             container.appendChild(card);
                         });
                         container.classList.remove('hidden');
-                        renderPagination();
+
+                        // Apply any active search filter
+                        if (currentSearch) {
+                            filterMeetings();
+                        } else {
+                            renderPagination();
+                        }
                     }
                 } else {
                     document.getElementById('meetingList').innerHTML = '<p class="text-red-500 text-center">Gagal memuat data: ' + (res.error || 'Unknown error') + '</p>';

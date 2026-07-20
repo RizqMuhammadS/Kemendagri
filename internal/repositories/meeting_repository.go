@@ -1,6 +1,7 @@
 package repositories
 
 import (
+	"strings"
 	"sync"
 	"time"
 
@@ -12,7 +13,7 @@ import (
 type MeetingRepository interface {
 	Create(meeting *models.Meeting) error
 	FindByID(id uint) (*models.Meeting, error)
-	FindAll(page, pageSize int) ([]models.Meeting, int64, error)
+	FindAll(page, pageSize int, search string) ([]models.Meeting, int64, error)
 	Update(meeting *models.Meeting) error
 	Delete(id uint) error
 
@@ -61,14 +62,21 @@ func (r *meetingRepository) FindByID(id uint) (*models.Meeting, error) {
 	return &meeting, nil
 }
 
-func (r *meetingRepository) FindAll(page, pageSize int) ([]models.Meeting, int64, error) {
+func (r *meetingRepository) FindAll(page, pageSize int, search string) ([]models.Meeting, int64, error) {
 	var meetings []models.Meeting
 	var total int64
 
-	r.db.Model(&models.Meeting{}).Count(&total)
+	query := r.db.Model(&models.Meeting{})
+
+	if search != "" {
+		query = query.Where("LOWER(title) LIKE LOWER(?) OR LOWER(location) LIKE LOWER(?) OR LOWER(transcript) LIKE LOWER(?) OR LOWER(summary) LIKE LOWER(?)",
+			"%"+search+"%", "%"+search+"%", "%"+search+"%", "%"+search+"%")
+	}
+
+	query.Count(&total)
 
 	offset := (page - 1) * pageSize
-	err := r.db.Order("created_at DESC").Offset(offset).Limit(pageSize).Find(&meetings).Error
+	err := query.Order("created_at DESC").Offset(offset).Limit(pageSize).Find(&meetings).Error
 	if err != nil {
 		return nil, 0, err
 	}
@@ -201,12 +209,21 @@ func (r *InMemoryMeetingRepository) FindByID(id uint) (*models.Meeting, error) {
 	return meeting, nil
 }
 
-func (r *InMemoryMeetingRepository) FindAll(page, pageSize int) ([]models.Meeting, int64, error) {
+func (r *InMemoryMeetingRepository) FindAll(page, pageSize int, search string) ([]models.Meeting, int64, error) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 
 	var meetings []models.Meeting
 	for _, m := range r.meetings {
+		if search != "" {
+			searchLower := strings.ToLower(search)
+			if !strings.Contains(strings.ToLower(m.Title), searchLower) &&
+				!strings.Contains(strings.ToLower(m.Location), searchLower) &&
+				!strings.Contains(strings.ToLower(m.Transcript), searchLower) &&
+				!strings.Contains(strings.ToLower(m.Summary), searchLower) {
+				continue
+			}
+		}
 		meetings = append(meetings, *m)
 	}
 

@@ -89,20 +89,22 @@ func (c *MeetingController) GetMeeting(ctx *gin.Context) {
 	})
 }
 
-// ListMeetings handles listing meetings
+// ListMeetings handles listing meetings with optional search
 // @Summary List all meetings
 // @Tags Meetings
 // @Produce json
 // @Security BearerAuth
 // @Param page query int false "Page number"
 // @Param page_size query int false "Page size"
+// @Param search query string false "Search keyword for title, location, transcript, or summary"
 // @Success 200 {object} dto.APIResponse
 // @Router /api/meetings [get]
 func (c *MeetingController) ListMeetings(ctx *gin.Context) {
 	page, _ := strconv.Atoi(ctx.DefaultQuery("page", "1"))
 	pageSize, _ := strconv.Atoi(ctx.DefaultQuery("page_size", "10"))
+	search := ctx.Query("search")
 
-	meetings, total, err := c.meetingService.ListMeetings(page, pageSize)
+	meetings, total, err := c.meetingService.ListMeetings(page, pageSize, search)
 	if err != nil {
 		ctx.JSON(http.StatusInternalServerError, dto.APIResponse{
 			Success: false,

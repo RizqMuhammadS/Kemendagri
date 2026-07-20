@@ -257,9 +257,9 @@ func (s *MeetingService) GetMeetingDetail(meetingID uint) (*dto.MeetingDetailRes
 	}, nil
 }
 
-// ListMeetings returns paginated meetings
-func (s *MeetingService) ListMeetings(page, pageSize int) ([]dto.MeetingResponse, int64, error) {
-	meetings, total, err := s.meetingRepo.FindAll(page, pageSize)
+// ListMeetings returns paginated meetings with optional search
+func (s *MeetingService) ListMeetings(page, pageSize int, search string) ([]dto.MeetingResponse, int64, error) {
+	meetings, total, err := s.meetingRepo.FindAll(page, pageSize, search)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -363,7 +363,7 @@ func (s *MeetingService) DeleteMeeting(meetingID uint) error {
 // GetDashboardStats returns dashboard statistics
 func (s *MeetingService) GetDashboardStats() (*dto.DashboardResponse, error) {
 	// Get counts
-	allMeetings, totalMeetings, _ := s.meetingRepo.FindAll(1, 10000)
+	allMeetings, totalMeetings, _ := s.meetingRepo.FindAll(1, 10000, "")
 
 	var completedCount, pendingCount int64
 	for _, m := range allMeetings {
