@@ -84,7 +84,18 @@ func (s *MeetingService) CreateMeeting(req *dto.CreateMeetingRequest, organizerI
 	return meeting, nil
 }
 
-// UploadAudio handles audio file upload and triggers transcription via STT (Whisper API)
+// updateProgress sets the progress percentage and message for a meeting
+func (s *MeetingService) updateProgress(meetingID uint, percentage int, message string) {
+	meeting, err := s.meetingRepo.FindByID(meetingID)
+	if err != nil {
+		return
+	}
+	meeting.ProgressPercentage = percentage
+	meeting.ProgressMessage = message
+	_ = s.meetingRepo.Update(meeting)
+}
+
+// UploadAudio handles audio file upload and triggers async transcription & AI processing
 func (s *MeetingService) UploadAudio(meetingID uint, file *multipart.FileHeader) error {
 	// Find meeting
 	meeting, err := s.meetingRepo.FindByID(meetingID)
@@ -120,31 +131,121 @@ func (s *MeetingService) UploadAudio(meetingID uint, file *multipart.FileHeader)
 		return fmt.Errorf("failed to save file: %w", err)
 	}
 
-	// Update meeting with audio URL
+	// Update meeting with audio URL and initial progress
 	meeting.AudioURL = savePath
 	meeting.Status = "processing"
+	meeting.ProgressPercentage = 5
+	meeting.ProgressMessage = "Menyimpan file audio..."
 	_ = s.meetingRepo.Update(meeting)
 
-	// Transcribe audio using STT service (OpenAI Whisper API)
-	transcript, err := s.sttService.Transcribe(savePath)
-	if err != nil {
-		meeting.Status = "failed"
-		_ = s.meetingRepo.Update(meeting)
-		return fmt.Errorf("transkripsi audio gagal: %w", err)
-	}
-
-	// Auto-generate notulensi dari hasil transkrip menggunakan AI
-	// Proses: transcript → cleaner → LLM summary → structured result
-	_, err = s.ProcessTranscript(meetingID, transcript)
-	if err != nil {
-		// Jika AI gagal, transcript tetap tersimpan agar user bisa coba lagi
-		meeting.Transcript = transcript
-		meeting.Status = "transcribed"
-		_ = s.meetingRepo.Update(meeting)
-		return fmt.Errorf("transkripsi berhasil, tetapi generate notulensi AI gagal: %w", err)
-	}
+	// Process audio asynchronously
+	go s.processAudioAsync(meetingID, savePath)
 
 	return nil
+}
+
+// processAudioAsync handles the async transcription and AI processing pipeline
+func (s *MeetingService) processAudioAsync(meetingID uint, audioPath string) {
+	// Step 1: Transcribe audio using STT service
+	s.updateProgress(meetingID, 10, "Mentranskripsi audio melalui Whisper AI...")
+	transcript, err := s.sttService.Transcribe(audioPath)
+	if err != nil {
+		s.updateProgress(meetingID, 0, fmt.Sprintf("Transkripsi gagal: %s", err.Error()))
+		meeting, findErr := s.meetingRepo.FindByID(meetingID)
+		if findErr == nil {
+			meeting.Status = "failed"
+			meeting.ProgressMessage = fmt.Sprintf("Transkripsi gagal: %s", err.Error())
+			_ = s.meetingRepo.Update(meeting)
+		}
+		return
+	}
+
+	s.updateProgress(meetingID, 60, "Transkripsi selesai, memproses teks...")
+
+	// Step 2: Save transcript and process
+	meeting, err := s.meetingRepo.FindByID(meetingID)
+	if err != nil {
+		return
+	}
+
+	meeting.Transcript = transcript
+	_ = s.meetingRepo.Update(meeting)
+
+	s.updateProgress(meetingID, 70, "Membersihkan teks transkrip...")
+
+	// Step 3: Clean the text
+	cleanedText := s.cleaner.CleanIndonesian(transcript)
+	meeting.CleanedText = cleanedText
+	_ = s.meetingRepo.Update(meeting)
+
+	s.updateProgress(meetingID, 75, "Membaca data peserta...")
+
+	// Step 4: Get participants for context
+	participants, err := s.meetingRepo.GetParticipants(meetingID)
+	if err != nil {
+		participants = []models.Participant{}
+	}
+
+	s.updateProgress(meetingID, 80, "Menghasilkan notulensi dengan AI (LLM)...")
+
+	// Step 5: Generate AI summary
+	result, err := s.llmService.GenerateMinutes(meeting.Title, participants, cleanedText)
+	if err != nil {
+		s.updateProgress(meetingID, 0, fmt.Sprintf("Generasi notulensi AI gagal: %s", err.Error()))
+		meeting.Status = "transcribed"
+		meeting.ProgressMessage = fmt.Sprintf("Transkripsi berhasil, tetapi AI gagal: %s", err.Error())
+		_ = s.meetingRepo.Update(meeting)
+		return
+	}
+
+	s.updateProgress(meetingID, 95, "Menyimpan hasil notulensi...")
+
+	// Step 6: Save structured results
+	meeting.Summary = result.Summary
+	meeting.Status = "completed"
+	meeting.ProgressPercentage = 100
+	meeting.ProgressMessage = "Notulensi berhasil dibuat!"
+
+	// Save discussion points
+	for i, point := range result.DiscussionPoints {
+		dp := &models.DiscussionPoint{
+			MeetingID: meetingID,
+			Point:     point,
+			Sequence:  i + 1,
+		}
+		_ = s.meetingRepo.AddDiscussionPoint(dp)
+	}
+
+	// Save decisions
+	for _, decision := range result.Decisions {
+		d := &models.Decision{
+			MeetingID: meetingID,
+			Decision:  decision,
+		}
+		_ = s.meetingRepo.AddDecision(d)
+	}
+
+	// Save action items
+	for _, item := range result.ActionItems {
+		var deadline time.Time
+		if item.Deadline != "" {
+			deadline, _ = time.Parse("2006-01-02", item.Deadline)
+		}
+
+		ai := &models.ActionItem{
+			MeetingID: meetingID,
+			Task:      item.Task,
+			Assignee:  item.Assignee,
+			Deadline:  deadline,
+			Status:    "pending",
+		}
+		_ = s.meetingRepo.AddActionItem(ai)
+	}
+
+	if err := s.meetingRepo.Update(meeting); err != nil {
+		s.updateProgress(meetingID, 0, fmt.Sprintf("Gagal menyimpan: %s", err.Error()))
+		return
+	}
 }
 
 // ProcessTranscript processes the transcript through cleaning and AI summarization
@@ -157,23 +258,36 @@ func (s *MeetingService) ProcessTranscript(meetingID uint, transcript string) (*
 	// Save original transcript
 	meeting.Transcript = transcript
 	meeting.Status = "processing"
+	meeting.ProgressPercentage = 10
+	meeting.ProgressMessage = "Menyimpan transkrip..."
 	_ = s.meetingRepo.Update(meeting)
 
 	// Step 1: Clean the text
+	meeting.ProgressPercentage = 30
+	meeting.ProgressMessage = "Membersihkan teks..."
+	_ = s.meetingRepo.Update(meeting)
 	cleanedText := s.cleaner.CleanIndonesian(transcript)
 	meeting.CleanedText = cleanedText
 	_ = s.meetingRepo.Update(meeting)
 
 	// Step 2: Get participants for context
+	meeting.ProgressPercentage = 40
+	meeting.ProgressMessage = "Mempersiapkan konteks rapat..."
+	_ = s.meetingRepo.Update(meeting)
 	participants, err := s.meetingRepo.GetParticipants(meetingID)
 	if err != nil {
 		participants = []models.Participant{}
 	}
 
 	// Step 3: Generate AI summary
+	meeting.ProgressPercentage = 50
+	meeting.ProgressMessage = "Menghasilkan notulensi dengan AI (LLM)..."
+	_ = s.meetingRepo.Update(meeting)
 	result, err := s.llmService.GenerateMinutes(meeting.Title, participants, cleanedText)
 	if err != nil {
 		meeting.Status = "failed"
+		meeting.ProgressPercentage = 0
+		meeting.ProgressMessage = fmt.Sprintf("AI summarization failed: %s", err.Error())
 		_ = s.meetingRepo.Update(meeting)
 		return nil, fmt.Errorf("AI summarization failed: %w", err)
 	}
@@ -181,6 +295,8 @@ func (s *MeetingService) ProcessTranscript(meetingID uint, transcript string) (*
 	// Step 4: Save structured results
 	meeting.Summary = result.Summary
 	meeting.Status = "completed"
+	meeting.ProgressPercentage = 100
+	meeting.ProgressMessage = "Notulensi berhasil dibuat!"
 
 	// Save discussion points
 	for i, point := range result.DiscussionPoints {
@@ -248,12 +364,14 @@ func (s *MeetingService) GetMeetingDetail(meetingID uint) (*dto.MeetingDetailRes
 		Transcript:  meeting.Transcript,
 		CleanedText: meeting.CleanedText,
 		Summary:     meeting.Summary,
-		Participants: toParticipantResponses(participants),
-		DiscussionPoints: toDiscussionPointResponses(discussionPoints),
-		Decisions:    toDecisionResponses(decisions),
-		ActionItems:  toActionItemResponses(actionItems),
-		CreatedAt:    meeting.CreatedAt,
-		UpdatedAt:    meeting.UpdatedAt,
+		Participants:           toParticipantResponses(participants),
+		DiscussionPoints:       toDiscussionPointResponses(discussionPoints),
+		Decisions:              toDecisionResponses(decisions),
+		ActionItems:            toActionItemResponses(actionItems),
+		ProgressPercentage:     meeting.ProgressPercentage,
+		ProgressMessage:        meeting.ProgressMessage,
+		CreatedAt:              meeting.CreatedAt,
+		UpdatedAt:              meeting.UpdatedAt,
 	}, nil
 }
 
@@ -268,13 +386,15 @@ func (s *MeetingService) ListMeetings(page, pageSize int, search string) ([]dto.
 	for _, m := range meetings {
 		participants, _ := s.meetingRepo.GetParticipants(m.ID)
 		responses = append(responses, dto.MeetingResponse{
-			ID:               m.ID,
-			Title:            m.Title,
-			Date:             m.Date.Format("2006-01-02"),
-			Location:         m.Location,
-			Status:           m.Status,
-			ParticipantCount: len(participants),
-			CreatedAt:        m.CreatedAt,
+			ID:                 m.ID,
+			Title:              m.Title,
+			Date:               m.Date.Format("2006-01-02"),
+			Location:           m.Location,
+			Status:             m.Status,
+			ParticipantCount:   len(participants),
+			ProgressPercentage: m.ProgressPercentage,
+			ProgressMessage:    m.ProgressMessage,
+			CreatedAt:          m.CreatedAt,
 		})
 	}
 
@@ -376,7 +496,6 @@ func (s *MeetingService) GetDashboardStats() (*dto.DashboardResponse, error) {
 
 	// Get total participants across all meetings
 	var totalParticipants int64
-	// Count distinct participants (simplified)
 	for _, m := range allMeetings {
 		participants, _ := s.meetingRepo.GetParticipants(m.ID)
 		totalParticipants += int64(len(participants))

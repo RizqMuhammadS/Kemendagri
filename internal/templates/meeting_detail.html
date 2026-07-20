@@ -10,6 +10,131 @@
         body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
         .sidebar { min-height: 100vh; }
         @media (max-width: 768px) { .sidebar { min-height: auto; } }
+        /* Loading Overlay Animation */
+        .loading-overlay {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.6);
+            z-index: 9999;
+            align-items: center;
+            justify-content: center;
+            backdrop-filter: blur(4px);
+        }
+        .loading-overlay.active {
+            display: flex;
+        }
+        .loading-card {
+            background: white;
+            border-radius: 1rem;
+            padding: 2rem 2.5rem;
+            max-width: 420px;
+            width: 90%;
+            text-align: center;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+            animation: loadingCardIn 0.3s ease-out;
+        }
+        @keyframes loadingCardIn {
+            from { opacity: 0; transform: scale(0.9) translateY(20px); }
+            to { opacity: 1; transform: scale(1) translateY(0); }
+        }
+        .loading-animation {
+            width: 80px;
+            height: 80px;
+            margin: 0 auto 1.5rem;
+            position: relative;
+        }
+        .loading-animation .circle {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            border: 4px solid #e0e7ff;
+            border-top-color: #4f46e5;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        .loading-animation .pulse {
+            position: absolute;
+            width: 60%;
+            height: 60%;
+            top: 20%;
+            left: 20%;
+            background: #eef2ff;
+            border-radius: 50%;
+            animation: pulse 1.5s ease-in-out infinite;
+        }
+        .loading-animation .icon {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.75rem;
+            color: #4f46e5;
+        }
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        @keyframes pulse {
+            0%, 100% { transform: scale(0.8); opacity: 0.6; }
+            50% { transform: scale(1.1); opacity: 1; }
+        }
+        .loading-progress {
+            width: 100%;
+            height: 8px;
+            background: #e5e7eb;
+            border-radius: 999px;
+            overflow: hidden;
+            margin: 1rem 0 0.5rem;
+        }
+        .loading-progress-bar {
+            height: 100%;
+            background: linear-gradient(90deg, #4f46e5, #818cf8);
+            border-radius: 999px;
+            transition: width 0.5s ease;
+            width: 0%;
+        }
+        .loading-progress-bar.indeterminate {
+            width: 30%;
+            animation: indeterminate 1.5s ease-in-out infinite;
+        }
+        @keyframes indeterminate {
+            0% { transform: translateX(-100%); }
+            100% { transform: translateX(400%); }
+        }
+        .loading-status {
+            font-size: 0.875rem;
+            color: #6b7280;
+            margin-top: 0.5rem;
+            transition: all 0.3s ease;
+            min-height: 1.25rem;
+        }
+        .loading-steps {
+            margin-top: 1rem;
+            text-align: left;
+        }
+        .loading-step {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.375rem 0;
+            font-size: 0.8125rem;
+            color: #9ca3af;
+            transition: all 0.3s ease;
+        }
+        .loading-step.active {
+            color: #4f46e5;
+            font-weight: 500;
+        }
+        .loading-step.completed {
+            color: #10b981;
+        }
+        .loading-step .step-icon {
+            width: 1.25rem;
+            text-align: center;
+            flex-shrink: 0;
+        }
     </style>
 </head>
 <body class="bg-gray-100">
@@ -237,6 +362,43 @@
         </div>
     </div>
 
+    <!-- Loading Overlay -->
+    <div id="loadingOverlay" class="loading-overlay">
+        <div class="loading-card">
+            <div class="loading-animation">
+                <div class="circle"></div>
+                <div class="pulse"></div>
+                <div class="icon">
+                    <i class="fas fa-cloud-upload-alt"></i>
+                </div>
+            </div>
+            <h3 id="loadingTitle" class="text-lg font-semibold text-gray-800 mb-1">Memproses Audio...</h3>
+            <p id="loadingSubtitle" class="text-sm text-gray-500">Harap tunggu, jangan tutup halaman ini</p>
+            <div class="loading-progress">
+                <div id="loadingProgressBar" class="loading-progress-bar indeterminate"></div>
+            </div>
+            <p id="loadingStatus" class="loading-status">Mengupload file audio...</p>
+            <div class="loading-steps">
+                <div id="stepUpload" class="loading-step active">
+                    <span class="step-icon"><i class="fas fa-circle"></i></span>
+                    <span>Upload file audio</span>
+                </div>
+                <div id="stepTranscribe" class="loading-step">
+                    <span class="step-icon"><i class="fas fa-circle"></i></span>
+                    <span>Transkripsi audio ke teks</span>
+                </div>
+                <div id="stepProcess" class="loading-step">
+                    <span class="step-icon"><i class="fas fa-circle"></i></span>
+                    <span>Generate notulensi AI</span>
+                </div>
+                <div id="stepDone" class="loading-step">
+                    <span class="step-icon"><i class="fas fa-circle"></i></span>
+                    <span>Notulensi siap</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <script>
         const API_BASE = '/api';
         function getToken() { return localStorage.getItem('token'); }
@@ -379,6 +541,153 @@
             btn.innerHTML = '<i class="fas fa-save mr-2"></i>Simpan';
         }
 
+        // --- Loading Overlay Functions ---
+        function showLoadingOverlay(title, subtitle) {
+            const overlay = document.getElementById('loadingOverlay');
+            document.getElementById('loadingTitle').textContent = title || 'Memproses...';
+            document.getElementById('loadingSubtitle').textContent = subtitle || 'Harap tunggu, jangan tutup halaman ini';
+            document.getElementById('loadingStatus').textContent = 'Memulai proses...';
+            document.getElementById('loadingProgressBar').className = 'loading-progress-bar indeterminate';
+            document.getElementById('loadingProgressBar').style.width = '';
+            // Reset all steps
+            const steps = ['stepUpload', 'stepTranscribe', 'stepProcess', 'stepDone'];
+            steps.forEach(id => {
+                const el = document.getElementById(id);
+                el.className = 'loading-step';
+                el.querySelector('.step-icon').innerHTML = '<i class="fas fa-circle"></i>';
+            });
+            overlay.classList.add('active');
+        }
+
+        function updateLoadingProgress(percent, statusMsg, stepActive, stepCompleted) {
+            const bar = document.getElementById('loadingProgressBar');
+            if (percent >= 0) {
+                bar.className = 'loading-progress-bar';
+                bar.style.width = Math.min(percent, 100) + '%';
+            } else {
+                bar.className = 'loading-progress-bar indeterminate';
+                bar.style.width = '';
+            }
+            if (statusMsg) {
+                document.getElementById('loadingStatus').textContent = statusMsg;
+            }
+            // Update steps
+            const stepIds = ['stepUpload', 'stepTranscribe', 'stepProcess', 'stepDone'];
+            stepIds.forEach(id => {
+                const el = document.getElementById(id);
+                el.className = 'loading-step';
+                if (stepCompleted && stepCompleted.includes(id)) {
+                    el.className = 'loading-step completed';
+                    el.querySelector('.step-icon').innerHTML = '<i class="fas fa-check-circle"></i>';
+                } else if (stepActive && stepActive.includes(id)) {
+                    el.className = 'loading-step active';
+                    el.querySelector('.step-icon').innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+                } else {
+                    el.querySelector('.step-icon').innerHTML = '<i class="fas fa-circle"></i>';
+                }
+            });
+            // Update loading icon
+            if (percent >= 100) {
+                document.querySelector('.loading-animation .icon').innerHTML = '<i class="fas fa-check-circle text-green-500"></i>';
+            } else {
+                document.querySelector('.loading-animation .icon').innerHTML = '<i class="fas fa-cloud-upload-alt"></i>';
+            }
+        }
+
+        function hideLoadingOverlay() {
+            document.getElementById('loadingOverlay').classList.remove('active');
+            document.getElementById('loadingProgressBar').className = 'loading-progress-bar';
+            document.getElementById('loadingProgressBar').style.width = '0%';
+            document.getElementById('loadingStatus').textContent = '';
+            document.querySelector('.loading-animation .icon').innerHTML = '<i class="fas fa-cloud-upload-alt"></i>';
+        }
+
+        let progressPollInterval = null;
+
+        function startProgressPolling(meetingId) {
+            if (progressPollInterval) clearInterval(progressPollInterval);
+            let pollCount = 0;
+            const maxPolls = 120; // 2 minutes max (1s intervals)
+
+            progressPollInterval = setInterval(async () => {
+                pollCount++;
+                try {
+                    const res = await apiRequest('GET', '/meetings/' + meetingId);
+                    if (res.success && res.data) {
+                        const d = res.data;
+                        let pct = d.progress_percentage;
+                        let msg = d.progress_message;
+
+                        if (pct !== undefined && pct !== null) {
+                            pct = parseInt(pct);
+                            let statusMsg = msg || 'Memproses...';
+                            let active = [];
+                            let completed = [];
+
+                            if (pct < 20) {
+                                active = ['stepUpload'];
+                                statusMsg = 'Mengupload file audio...';
+                            } else if (pct < 40) {
+                                completed = ['stepUpload'];
+                                active = ['stepTranscribe'];
+                                statusMsg = 'Sedang mentranskripsi audio...';
+                            } else if (pct < 70) {
+                                completed = ['stepUpload', 'stepTranscribe'];
+                                active = ['stepProcess'];
+                                statusMsg = 'Mengenerate notulensi dengan AI...';
+                            } else if (pct < 100) {
+                                completed = ['stepUpload', 'stepTranscribe', 'stepProcess'];
+                                active = ['stepDone'];
+                                statusMsg = 'Menyelesaikan...';
+                            } else {
+                                completed = ['stepUpload', 'stepTranscribe', 'stepProcess', 'stepDone'];
+                                statusMsg = 'Selesai! ✅';
+                                clearInterval(progressPollInterval);
+                                progressPollInterval = null;
+                                // Small delay then hide and reload
+                                setTimeout(() => {
+                                    hideLoadingOverlay();
+                                    loadMeeting();
+                                    showAlert('✅ Notulensi berhasil digenerate!', 'success');
+                                }, 500);
+                                return;
+                            }
+                            updateLoadingProgress(pct, statusMsg, active, completed);
+                        } else {
+                            // No progress info, use indeterminate
+                            if (pollCount > 2 && d.status === 'completed') {
+                                clearInterval(progressPollInterval);
+                                progressPollInterval = null;
+                                hideLoadingOverlay();
+                                loadMeeting();
+                                showAlert('✅ Notulensi berhasil digenerate!', 'success');
+                                return;
+                            }
+                            if (d.status === 'failed') {
+                                clearInterval(progressPollInterval);
+                                progressPollInterval = null;
+                                hideLoadingOverlay();
+                                loadMeeting();
+                                showAlert('⚠️ Proses gagal, silakan coba lagi', 'error');
+                                return;
+                            }
+                            updateLoadingProgress(-1, 'Memproses... [' + pollCount + 's]', ['stepUpload', 'stepTranscribe', 'stepProcess'], []);
+                        }
+                    }
+                } catch (e) {
+                    console.error('Progress poll error:', e);
+                }
+
+                if (pollCount >= maxPolls) {
+                    clearInterval(progressPollInterval);
+                    progressPollInterval = null;
+                    hideLoadingOverlay();
+                    loadMeeting();
+                    showAlert('⚠️ Waktu proses habis, refresh halaman untuk melihat status terbaru', 'error');
+                }
+            }, 1000);
+        }
+
         async function uploadAudio() {
             if (!selectedFile) { showAlert('Pilih file audio terlebih dahulu', 'error'); return; }
             const formData = new FormData();
@@ -390,7 +699,10 @@
             const processBtn = document.getElementById('processTranscriptBtn');
             btn.disabled = true;
             fileInput.disabled = true;
-            btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Upload & Proses Notulensi...';
+
+            // Show loading overlay
+            showLoadingOverlay('Memproses Audio...', 'Mengupload dan memproses file audio. Harap tunggu...');
+            updateLoadingProgress(5, 'Mengupload file audio...', ['stepUpload'], []);
 
             try {
                 const token = getToken();
@@ -400,26 +712,23 @@
                     body: formData
                 });
                 const json = await res.json();
+
                 if (json.success) {
-                    showAlert('✅ Audio berhasil diproses! Notulensi sedang di-generate...', 'success');
-                    // Reload untuk menampilkan hasil transcript + notulensi AI
-                    await loadMeeting();
-                    // Jika sudah completed, sembunyikan tombol generate manual
-                    if (meetingData && meetingData.summary) {
-                        processBtn.classList.add('hidden');
-                    }
-                    showAlert('✅ Notulensi berhasil digenerate!', 'success');
+                    updateLoadingProgress(20, 'Upload selesai, memulai transkripsi...', ['stepTranscribe'], ['stepUpload']);
+                    // Start polling for progress
+                    startProgressPolling(meetingId);
                 } else {
+                    hideLoadingOverlay();
                     showAlert(json.error || 'Gagal upload audio', 'error');
-                    // Jika transcript berhasil tersimpan tapi AI gagal, tetap load
                     await loadMeeting();
                 }
             } catch (err) {
+                hideLoadingOverlay();
                 showAlert('Gagal upload audio: ' + err.message, 'error');
             }
             btn.disabled = false;
             fileInput.disabled = false;
-            btn.innerHTML = '<i class="fas fa-cloud-upload-alt mr-2"></i>Upload Audio';
+            btn.innerHTML = '<i class="fas fa-cloud-upload-alt mr-2"></i>Upload';
         }
 
         async function processTranscript() {
@@ -427,13 +736,20 @@
             const transcript = document.getElementById('transcriptInput').value.trim();
             if (!transcript) {
                 showAlert('Silakan masukkan transkrip rapat terlebih dahulu!', 'error');
-                document.getElementById('processTranscriptBtn').disabled = false;
                 return;
             }
 
             const btn = document.getElementById('processTranscriptBtn');
             btn.disabled = true;
             btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Memproses...';
+
+            // Show loading overlay for AI processing
+            showLoadingOverlay('Mengenerate Notulensi AI...', 'AI sedang menganalisis transkrip dan membuat notulensi...');
+            updateLoadingProgress(10, 'Mengirim transkrip ke AI...', ['stepUpload', 'stepTranscribe', 'stepProcess'], []);
+            // Mark upload and transcribe as completed since user already provided text
+            setTimeout(() => {
+                updateLoadingProgress(30, 'Menganalisis transkrip...', ['stepProcess'], ['stepUpload', 'stepTranscribe']);
+            }, 500);
 
             try {
                 const headers = { 'Content-Type': 'application/json' };
@@ -449,13 +765,19 @@
                 });
                 const json = await res.json();
                 if (json.success) {
-                    showAlert('Notulensi berhasil digenerate!', 'success');
-                    loadMeeting();
+                    updateLoadingProgress(100, 'Notulensi berhasil digenerate! ✅', ['stepDone'], ['stepUpload', 'stepTranscribe', 'stepProcess', 'stepDone']);
+                    setTimeout(() => {
+                        hideLoadingOverlay();
+                        loadMeeting();
+                        showAlert('Notulensi berhasil digenerate!', 'success');
+                    }, 800);
                 } else {
+                    hideLoadingOverlay();
                     showAlert(json.error || 'Gagal proses transkrip', 'error');
                     console.error('processTranscript error:', json);
                 }
             } catch (err) {
+                hideLoadingOverlay();
                 showAlert('Gagal proses transkrip: ' + err.message, 'error');
                 console.error('processTranscript exception:', err);
             }

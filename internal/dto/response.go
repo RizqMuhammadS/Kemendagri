@@ -22,33 +22,37 @@ type PaginationResponse struct {
 
 // MeetingResponse represents a meeting in API responses
 type MeetingResponse struct {
-	ID            uint      `json:"id"`
-	Title         string    `json:"title"`
-	Date          string    `json:"date"`
-	Location      string    `json:"location"`
-	Status        string    `json:"status"`
-	ParticipantCount int    `json:"participant_count"`
-	CreatedAt     time.Time `json:"created_at"`
+	ID                 uint      `json:"id"`
+	Title              string    `json:"title"`
+	Date               string    `json:"date"`
+	Location           string    `json:"location"`
+	Status             string    `json:"status"`
+	ParticipantCount   int       `json:"participant_count"`
+	ProgressPercentage int       `json:"progress_percentage"`
+	ProgressMessage    string    `json:"progress_message"`
+	CreatedAt          time.Time `json:"created_at"`
 }
 
 // MeetingDetailResponse is the full meeting detail
 type MeetingDetailResponse struct {
-	ID              uint                 `json:"id"`
-	Title           string               `json:"title"`
-	Date            string               `json:"date"`
-	Location        string               `json:"location"`
-	Status          string               `json:"status"`
-	OrganizerID     uint                 `json:"organizer_id"`
-	AudioURL        string               `json:"audio_url"`
-	Transcript      string               `json:"transcript"`
-	CleanedText     string               `json:"cleaned_text"`
-	Summary         string               `json:"summary"`
-	Participants    []ParticipantResponse `json:"participants"`
-	DiscussionPoints []DiscussionPointResponse `json:"discussion_points"`
-	Decisions       []DecisionResponse    `json:"decisions"`
-	ActionItems     []ActionItemResponse  `json:"action_items"`
-	CreatedAt       time.Time             `json:"created_at"`
-	UpdatedAt       time.Time             `json:"updated_at"`
+	ID                 uint                      `json:"id"`
+	Title              string                    `json:"title"`
+	Date               string                    `json:"date"`
+	Location           string                    `json:"location"`
+	Status             string                    `json:"status"`
+	OrganizerID        uint                      `json:"organizer_id"`
+	AudioURL           string                    `json:"audio_url"`
+	Transcript         string                    `json:"transcript"`
+	CleanedText        string                    `json:"cleaned_text"`
+	Summary            string                    `json:"summary"`
+	Participants       []ParticipantResponse     `json:"participants"`
+	DiscussionPoints   []DiscussionPointResponse `json:"discussion_points"`
+	Decisions          []DecisionResponse        `json:"decisions"`
+	ActionItems        []ActionItemResponse      `json:"action_items"`
+	ProgressPercentage int                       `json:"progress_percentage"`
+	ProgressMessage    string                    `json:"progress_message"`
+	CreatedAt          time.Time                 `json:"created_at"`
+	UpdatedAt          time.Time                 `json:"updated_at"`
 }
 
 // ParticipantResponse represents a participant in responses

@@ -4,18 +4,20 @@ import "time"
 
 // Meeting represents a meeting session
 type Meeting struct {
-	ID          uint      `json:"id" gorm:"primaryKey"`
-	Title       string    `json:"title" gorm:"not null"`
-	Date        time.Time `json:"date" gorm:"not null"`
-	Location    string    `json:"location"`
-	OrganizerID uint      `json:"organizer_id"`
-	Status      string    `json:"status" gorm:"default:'pending'"` // pending, processing, completed, failed
-	AudioURL    string    `json:"audio_url"`
-	Transcript  string    `json:"transcript" gorm:"type:text"`
-	CleanedText string    `json:"cleaned_text" gorm:"type:text"`
-	Summary     string    `json:"summary" gorm:"type:text"`
-	CreatedAt   time.Time `json:"created_at"`
-	UpdatedAt   time.Time `json:"updated_at"`
+	ID                uint      `json:"id" gorm:"primaryKey"`
+	Title             string    `json:"title" gorm:"not null"`
+	Date              time.Time `json:"date" gorm:"not null"`
+	Location          string    `json:"location"`
+	OrganizerID       uint      `json:"organizer_id"`
+	Status            string    `json:"status" gorm:"default:'pending'"` // pending, processing, completed, failed
+	AudioURL          string    `json:"audio_url"`
+	Transcript        string    `json:"transcript" gorm:"type:text"`
+	CleanedText       string    `json:"cleaned_text" gorm:"type:text"`
+	Summary           string    `json:"summary" gorm:"type:text"`
+	ProgressPercentage int      `json:"progress_percentage" gorm:"default:0"`
+	ProgressMessage   string    `json:"progress_message" gorm:"type:varchar(255);default:''"`
+	CreatedAt         time.Time `json:"created_at"`
+	UpdatedAt         time.Time `json:"updated_at"`
 }
 
 // Participant represents a meeting participant
