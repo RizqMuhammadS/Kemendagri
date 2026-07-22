@@ -1,6 +1,7 @@
 package controllers
 
 import (
+	"fmt"
 	"net/http"
 	"path/filepath"
 	"strconv"
@@ -116,9 +117,9 @@ func (c *MeetingController) ListMeetings(ctx *gin.Context) {
 	ctx.JSON(http.StatusOK, dto.APIResponse{
 		Success: true,
 		Data: gin.H{
-			"meetings": meetings,
-			"total":    total,
-			"page":     page,
+			"meetings":  meetings,
+			"total":     total,
+			"page":      page,
 			"page_size": pageSize,
 		},
 	})
@@ -357,6 +358,36 @@ func (c *MeetingController) DeleteMeeting(ctx *gin.Context) {
 		Success: true,
 		Message: "Rapat berhasil dihapus",
 	})
+}
+
+// StreamAudio serves the audio file for a meeting
+// @Summary Stream meeting audio file
+// @Tags Meetings
+// @Produce octet-stream
+// @Security BearerAuth
+// @Param id path int true "Meeting ID"
+// @Success 200 {file} binary
+// @Router /api/meetings/{id}/audio [get]
+func (c *MeetingController) StreamAudio(ctx *gin.Context) {
+	id, err := strconv.ParseUint(ctx.Param("id"), 10, 32)
+	if err != nil {
+		ctx.JSON(http.StatusBadRequest, dto.APIResponse{
+			Success: false,
+			Error:   "Invalid meeting ID",
+		})
+		return
+	}
+
+	audioPath, err := c.meetingService.GetAudioPath(uint(id))
+	if err != nil {
+		ctx.JSON(http.StatusNotFound, dto.APIResponse{
+			Success: false,
+			Error:   fmt.Sprintf("Audio tidak ditemukan: %s", err.Error()),
+		})
+		return
+	}
+
+	ctx.File(audioPath)
 }
 
 // GetDashboard handles dashboard statistics

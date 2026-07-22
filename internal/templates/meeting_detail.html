@@ -10,130 +10,250 @@
         body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
         .sidebar { min-height: 100vh; }
         @media (max-width: 768px) { .sidebar { min-height: auto; } }
-        /* Loading Overlay Animation */
+        /* === Loading Overlay - AI Notulensi Style === */
         .loading-overlay {
             display: none;
             position: fixed;
             inset: 0;
-            background: rgba(0, 0, 0, 0.6);
             z-index: 9999;
             align-items: center;
             justify-content: center;
-            backdrop-filter: blur(4px);
+            background: rgba(0, 0, 0, 0.7);
+            backdrop-filter: blur(8px);
         }
-        .loading-overlay.active {
-            display: flex;
-        }
+        .loading-overlay.active { display: flex; }
+
         .loading-card {
-            background: white;
-            border-radius: 1rem;
-            padding: 2rem 2.5rem;
-            max-width: 420px;
-            width: 90%;
+            background: linear-gradient(135deg, #1e1b4b 0%, #312e81 50%, #3730a3 100%);
+            border-radius: 1.25rem;
+            padding: 2.5rem 2.5rem 2rem;
+            max-width: 440px;
+            width: 92%;
             text-align: center;
-            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
-            animation: loadingCardIn 0.3s ease-out;
+            box-shadow: 0 0 60px rgba(79, 70, 229, 0.3), 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+            animation: loadingCardIn 0.4s cubic-bezier(0.21, 1.02, 0.73, 1) forwards;
+            border: 1px solid rgba(129, 140, 248, 0.2);
+            position: relative;
+            overflow: hidden;
+        }
+        .loading-card::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: radial-gradient(circle at 30% 20%, rgba(129, 140, 248, 0.08) 0%, transparent 60%),
+                        radial-gradient(circle at 70% 80%, rgba(99, 102, 241, 0.06) 0%, transparent 50%);
+            pointer-events: none;
         }
         @keyframes loadingCardIn {
-            from { opacity: 0; transform: scale(0.9) translateY(20px); }
-            to { opacity: 1; transform: scale(1) translateY(0); }
+            0% { opacity: 0; transform: scale(0.85) translateY(30px); }
+            100% { opacity: 1; transform: scale(1) translateY(0); }
         }
-        .loading-animation {
-            width: 80px;
+
+        /* Animated audio waveform */
+        .ai-loading-animation {
+            width: 100px;
             height: 80px;
             margin: 0 auto 1.5rem;
             position: relative;
-        }
-        .loading-animation .circle {
-            position: absolute;
-            width: 100%;
-            height: 100%;
-            border: 4px solid #e0e7ff;
-            border-top-color: #4f46e5;
-            border-radius: 50%;
-            animation: spin 1s linear infinite;
-        }
-        .loading-animation .pulse {
-            position: absolute;
-            width: 60%;
-            height: 60%;
-            top: 20%;
-            left: 20%;
-            background: #eef2ff;
-            border-radius: 50%;
-            animation: pulse 1.5s ease-in-out infinite;
-        }
-        .loading-animation .icon {
-            position: absolute;
-            width: 100%;
-            height: 100%;
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 1.75rem;
-            color: #4f46e5;
+            gap: 0.25rem;
         }
-        @keyframes spin {
-            to { transform: rotate(360deg); }
+        .wave-bar {
+            width: 5px;
+            background: linear-gradient(to top, #818cf8, #a5b4fc);
+            border-radius: 999px;
+            animation: waveAnim 0.8s ease-in-out infinite;
+            transform-origin: bottom;
+            min-height: 8px;
         }
-        @keyframes pulse {
-            0%, 100% { transform: scale(0.8); opacity: 0.6; }
-            50% { transform: scale(1.1); opacity: 1; }
+        .wave-bar:nth-child(1) { height: 30%; animation-delay: 0s; }
+        .wave-bar:nth-child(2) { height: 55%; animation-delay: 0.1s; }
+        .wave-bar:nth-child(3) { height: 75%; animation-delay: 0.2s; }
+        .wave-bar:nth-child(4) { height: 90%; animation-delay: 0.3s; }
+        .wave-bar:nth-child(5) { height: 100%; animation-delay: 0.4s; }
+        .wave-bar:nth-child(6) { height: 90%; animation-delay: 0.3s; }
+        .wave-bar:nth-child(7) { height: 75%; animation-delay: 0.2s; }
+        .wave-bar:nth-child(8) { height: 55%; animation-delay: 0.1s; }
+        .wave-bar:nth-child(9) { height: 30%; animation-delay: 0s; }
+        @keyframes waveAnim {
+            0%, 100% { transform: scaleY(0.4); opacity: 0.6; }
+            50% { transform: scaleY(1); opacity: 1; }
         }
+
+        /* Floating AI brain icon centered on waveform */
+        .ai-icon-container {
+            position: absolute;
+            inset: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 2;
+        }
+        .ai-icon-container .ai-icon {
+            width: 44px;
+            height: 44px;
+            background: linear-gradient(135deg, #4f46e5, #7c3aed);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 1.25rem;
+            box-shadow: 0 0 25px rgba(79, 70, 229, 0.5);
+            animation: aiPulse 2s ease-in-out infinite;
+        }
+        @keyframes aiPulse {
+            0%, 100% { box-shadow: 0 0 15px rgba(79, 70, 229, 0.3); transform: scale(1); }
+            50% { box-shadow: 0 0 35px rgba(79, 70, 229, 0.7); transform: scale(1.08); }
+        }
+
+        /* Orbiting ring */
+        .ai-ring {
+            position: absolute;
+            width: 90px;
+            height: 90px;
+            border: 2px solid rgba(129, 140, 248, 0.15);
+            border-top-color: #818cf8;
+            border-right-color: #a5b4fc;
+            border-radius: 50%;
+            animation: spin 1.8s linear infinite;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        .loading-title {
+            font-size: 1.1rem;
+            font-weight: 700;
+            color: #e0e7ff;
+            margin-bottom: 0.25rem;
+            position: relative;
+            z-index: 1;
+        }
+        .loading-subtitle {
+            font-size: 0.8rem;
+            color: rgba(165, 180, 252, 0.7);
+            margin-bottom: 1.25rem;
+            position: relative;
+            z-index: 1;
+        }
+
+        /* Glowing progress bar */
         .loading-progress {
             width: 100%;
-            height: 8px;
-            background: #e5e7eb;
+            height: 6px;
+            background: rgba(255, 255, 255, 0.1);
             border-radius: 999px;
             overflow: hidden;
-            margin: 1rem 0 0.5rem;
+            margin: 0.75rem 0 0.25rem;
+            position: relative;
+            z-index: 1;
         }
         .loading-progress-bar {
             height: 100%;
-            background: linear-gradient(90deg, #4f46e5, #818cf8);
+            background: linear-gradient(90deg, #818cf8, #a78bfa, #c084fc);
             border-radius: 999px;
-            transition: width 0.5s ease;
+            transition: width 0.5s cubic-bezier(0.4, 0, 0.2, 1);
             width: 0%;
+            position: relative;
+            box-shadow: 0 0 12px rgba(129, 140, 248, 0.5);
         }
         .loading-progress-bar.indeterminate {
-            width: 30%;
-            animation: indeterminate 1.5s ease-in-out infinite;
+            width: 40%;
+            animation: indeterminate 1.8s ease-in-out infinite;
         }
         @keyframes indeterminate {
-            0% { transform: translateX(-100%); }
-            100% { transform: translateX(400%); }
+            0% { transform: translateX(-120%); }
+            100% { transform: translateX(350%); }
         }
+
         .loading-status {
-            font-size: 0.875rem;
-            color: #6b7280;
-            margin-top: 0.5rem;
+            font-size: 0.8rem;
+            color: rgba(199, 210, 254, 0.8);
+            margin-top: 0.35rem;
             transition: all 0.3s ease;
-            min-height: 1.25rem;
+            min-height: 1.2rem;
+            position: relative;
+            z-index: 1;
+            letter-spacing: 0.01em;
         }
+
+        /* Step indicators with connecting line */
         .loading-steps {
-            margin-top: 1rem;
-            text-align: left;
+            margin-top: 1.25rem;
+            position: relative;
+            z-index: 1;
         }
         .loading-step {
             display: flex;
             align-items: center;
-            gap: 0.5rem;
-            padding: 0.375rem 0;
+            gap: 0.65rem;
+            padding: 0.45rem 0;
             font-size: 0.8125rem;
-            color: #9ca3af;
-            transition: all 0.3s ease;
+            color: rgba(165, 180, 252, 0.4);
+            transition: all 0.4s ease;
+            position: relative;
+        }
+        .loading-step + .loading-step::before {
+            content: '';
+            position: absolute;
+            left: 0.56rem;
+            top: -0.25rem;
+            width: 2px;
+            height: 1rem;
+            background: rgba(165, 180, 252, 0.1);
         }
         .loading-step.active {
-            color: #4f46e5;
+            color: #a5b4fc;
             font-weight: 500;
         }
+        .loading-step.active + .loading-step::before,
+        .loading-step.completed + .loading-step::before {
+            background: rgba(129, 140, 248, 0.3);
+        }
         .loading-step.completed {
-            color: #10b981;
+            color: #6ee7b7;
+        }
+        .loading-step.completed + .loading-step::before {
+            background: rgba(52, 211, 153, 0.3);
         }
         .loading-step .step-icon {
-            width: 1.25rem;
-            text-align: center;
+            width: 1.2rem;
+            height: 1.2rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
             flex-shrink: 0;
+            font-size: 0.65rem;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.05);
+            transition: all 0.3s ease;
+        }
+        .loading-step.active .step-icon {
+            background: rgba(129, 140, 248, 0.2);
+            box-shadow: 0 0 10px rgba(129, 140, 248, 0.2);
+        }
+        .loading-step.completed .step-icon {
+            background: rgba(52, 211, 153, 0.15);
+        }
+        .loading-step .step-label {
+            transition: all 0.3s ease;
+        }
+
+        /* Small dots animation for processing text */
+        .loading-dots::after {
+            content: '';
+            animation: dots 1.5s steps(4, end) infinite;
+        }
+        @keyframes dots {
+            0% { content: ''; }
+            25% { content: '.'; }
+            50% { content: '..'; }
+            75% { content: '...'; }
+            100% { content: ''; }
         }
     </style>
 </head>
@@ -362,38 +482,52 @@
         </div>
     </div>
 
-    <!-- Loading Overlay -->
+    <!-- Loading Overlay - AI Notulensi Style -->
     <div id="loadingOverlay" class="loading-overlay">
         <div class="loading-card">
-            <div class="loading-animation">
-                <div class="circle"></div>
-                <div class="pulse"></div>
-                <div class="icon">
-                    <i class="fas fa-cloud-upload-alt"></i>
+            <!-- Animated audio waveform with AI icon -->
+            <div class="ai-loading-animation">
+                <div class="ai-ring"></div>
+                <div class="ai-icon-container">
+                    <div class="ai-icon">
+                        <i class="fas fa-brain"></i>
+                    </div>
                 </div>
+                <div class="wave-bar"></div>
+                <div class="wave-bar"></div>
+                <div class="wave-bar"></div>
+                <div class="wave-bar"></div>
+                <div class="wave-bar"></div>
+                <div class="wave-bar"></div>
+                <div class="wave-bar"></div>
+                <div class="wave-bar"></div>
+                <div class="wave-bar"></div>
             </div>
-            <h3 id="loadingTitle" class="text-lg font-semibold text-gray-800 mb-1">Memproses Audio...</h3>
-            <p id="loadingSubtitle" class="text-sm text-gray-500">Harap tunggu, jangan tutup halaman ini</p>
+
+            <h3 id="loadingTitle" class="loading-title">Memproses Audio...</h3>
+            <p id="loadingSubtitle" class="loading-subtitle">Harap tunggu, jangan tutup halaman ini</p>
+
             <div class="loading-progress">
                 <div id="loadingProgressBar" class="loading-progress-bar indeterminate"></div>
             </div>
             <p id="loadingStatus" class="loading-status">Mengupload file audio...</p>
+
             <div class="loading-steps">
                 <div id="stepUpload" class="loading-step active">
-                    <span class="step-icon"><i class="fas fa-circle"></i></span>
-                    <span>Upload file audio</span>
+                    <span class="step-icon"><i class="fas fa-spinner fa-spin"></i></span>
+                    <span class="step-label">Upload file audio</span>
                 </div>
                 <div id="stepTranscribe" class="loading-step">
                     <span class="step-icon"><i class="fas fa-circle"></i></span>
-                    <span>Transkripsi audio ke teks</span>
+                    <span class="step-label">Transkripsi audio ke teks</span>
                 </div>
                 <div id="stepProcess" class="loading-step">
                     <span class="step-icon"><i class="fas fa-circle"></i></span>
-                    <span>Generate notulensi AI</span>
+                    <span class="step-label">Generate notulensi AI</span>
                 </div>
                 <div id="stepDone" class="loading-step">
                     <span class="step-icon"><i class="fas fa-circle"></i></span>
-                    <span>Notulensi siap</span>
+                    <span class="step-label">Notulensi siap</span>
                 </div>
             </div>
         </div>
@@ -586,11 +720,18 @@
                     el.querySelector('.step-icon').innerHTML = '<i class="fas fa-circle"></i>';
                 }
             });
-            // Update loading icon
-            if (percent >= 100) {
-                document.querySelector('.loading-animation .icon').innerHTML = '<i class="fas fa-check-circle text-green-500"></i>';
-            } else {
-                document.querySelector('.loading-animation .icon').innerHTML = '<i class="fas fa-cloud-upload-alt"></i>';
+            // Update AI icon pulse intensity based on progress
+            const aiIcon = document.querySelector('.ai-icon-container .ai-icon');
+            if (aiIcon) {
+                if (percent >= 100) {
+                    aiIcon.style.background = 'linear-gradient(135deg, #10b981, #34d399)';
+                    aiIcon.style.boxShadow = '0 0 30px rgba(52, 211, 153, 0.6)';
+                    aiIcon.innerHTML = '<i class="fas fa-check-circle"></i>';
+                } else {
+                    aiIcon.style.background = 'linear-gradient(135deg, #4f46e5, #7c3aed)';
+                    aiIcon.style.boxShadow = '0 0 25px rgba(79, 70, 229, 0.5)';
+                    aiIcon.innerHTML = '<i class="fas fa-brain"></i>';
+                }
             }
         }
 
@@ -599,7 +740,12 @@
             document.getElementById('loadingProgressBar').className = 'loading-progress-bar';
             document.getElementById('loadingProgressBar').style.width = '0%';
             document.getElementById('loadingStatus').textContent = '';
-            document.querySelector('.loading-animation .icon').innerHTML = '<i class="fas fa-cloud-upload-alt"></i>';
+            const aiIcon = document.querySelector('.ai-icon-container .ai-icon');
+            if (aiIcon) {
+                aiIcon.style.background = 'linear-gradient(135deg, #4f46e5, #7c3aed)';
+                aiIcon.style.boxShadow = '0 0 25px rgba(79, 70, 229, 0.5)';
+                aiIcon.innerHTML = '<i class="fas fa-brain"></i>';
+            }
         }
 
         let progressPollInterval = null;

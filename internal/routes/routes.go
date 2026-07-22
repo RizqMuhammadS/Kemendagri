@@ -78,6 +78,7 @@ func SetupRouter(
 				meetings.POST("", meetingCtrl.CreateMeeting)
 				meetings.GET("", meetingCtrl.ListMeetings)
 				meetings.GET("/:id", meetingCtrl.GetMeeting)
+				meetings.GET("/:id/audio", meetingCtrl.StreamAudio)
 				meetings.POST("/upload-audio", meetingCtrl.UploadAudio)
 				meetings.POST("/process-transcript", meetingCtrl.ProcessTranscript)
 				meetings.POST("/export", meetingCtrl.ExportMeeting)

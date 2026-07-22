@@ -412,14 +412,26 @@
 
         function onSearchInput() {
             clearTimeout(searchTimeout);
+            const val = document.getElementById('searchInput').value.trim();
+            currentSearch = val;
             searchTimeout = setTimeout(() => {
-                applyFilters();
-            }, 200);
+                // Reload from server with search param
+                currentPage = 1;
+                loadMeetings(1);
+            }, 400);
         }
 
         function filterMeetings() {
-            const searchVal = document.getElementById('searchInput').value.trim().toLowerCase();
-            currentSearch = searchVal;
+            const searchInputVal = document.getElementById('searchInput').value.trim().toLowerCase();
+            // If currentSearch is set (from server-side search), use it as the display value
+            const searchVal = currentSearch ? currentSearch.toLowerCase() : searchInputVal;
+            
+            // Track whether we need client-side text matching.
+            // When currentSearch is set, the server already filtered by search term across 
+            // title, location, transcript, and summary. We should NOT re-filter text client-side
+            // because server might have matched on transcript/summary fields that aren't in data-attributes.
+            // So we only do client-side text matching when there's no currentSearch.
+            const doTextFilter = !currentSearch && searchInputVal !== '';
 
             if (searchVal !== '') {
                 document.getElementById('clearSearchBtn').classList.remove('hidden');
@@ -437,8 +449,8 @@
                 const status = card.getAttribute('data-status') || '';
                 const date = card.getAttribute('data-date') || '';
 
-                // Text search filter
-                const matchesSearch = !searchVal || title.includes(searchVal) || location.includes(searchVal);
+                // Text search filter (only if server didn't already search)
+                const matchesSearch = !doTextFilter || title.includes(searchInputVal) || location.includes(searchInputVal);
 
                 // Status filter
                 const matchesStatus = !activeFilters.status || status === activeFilters.status;
@@ -497,14 +509,19 @@
         }
 
         function searchMeetings() {
-            applyFilters();
+            clearTimeout(searchTimeout);
+            const val = document.getElementById('searchInput').value.trim();
+            currentSearch = val;
+            currentPage = 1;
+            loadMeetings(1);
         }
 
         function clearSearch() {
             document.getElementById('searchInput').value = '';
             currentSearch = '';
             document.getElementById('clearSearchBtn').classList.add('hidden');
-            filterMeetings();
+            currentPage = 1;
+            loadMeetings(1);
         }
 
         async function loadMeetings(page = 1) {

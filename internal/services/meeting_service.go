@@ -144,6 +144,20 @@ func (s *MeetingService) UploadAudio(meetingID uint, file *multipart.FileHeader)
 	return nil
 }
 
+// GetAudioPath returns the audio file path for a meeting
+func (s *MeetingService) GetAudioPath(meetingID uint) (string, error) {
+	meeting, err := s.meetingRepo.FindByID(meetingID)
+	if err != nil {
+		return "", fmt.Errorf("meeting not found: %w", err)
+	}
+
+	if meeting.AudioURL == "" {
+		return "", fmt.Errorf("no audio file for this meeting")
+	}
+
+	return meeting.AudioURL, nil
+}
+
 // processAudioAsync handles the async transcription and AI processing pipeline
 func (s *MeetingService) processAudioAsync(meetingID uint, audioPath string) {
 	// Step 1: Transcribe audio using STT service
